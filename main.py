@@ -47,13 +47,13 @@ law_agent_dynamic = ModernDynamicLawAgentWithSessionMemory(llm_provider="ollama"
 
 # First question
 print("=== First Question ===")
-response = law_agent_dynamic.answer_questions("current president of Germany", "user_session_123")
+response = law_agent_dynamic.answer_questions("current president of Germany", 12, "user_session_123")
 print("Response:", response.get('output', response))
 print()
 
 # Second question - testing memory
 print("=== Second Question (Testing Memory) ===")
-response = law_agent_dynamic.answer_questions("what did I ask before", "user_session_123")
+response = law_agent_dynamic.answer_questions("what did I ask before", 12, "user_session_123")
 print("Response:", response.get('output', response))
 print()
 

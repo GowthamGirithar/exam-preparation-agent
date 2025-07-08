@@ -5,7 +5,7 @@ from langchain.agents import AgentExecutor, create_react_agent
 from config import Config
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from memory.memory_setup import get_session_history
-
+from langchain_core.runnables.utils import ConfigurableFieldSpec
 
 
 
@@ -115,17 +115,36 @@ Question: {input}
                              agent_executor,
                              get_session_history,
                              input_messages_key="input",         # matches your key for user message
-                             history_messages_key="chat_history"  # matches what your prompt uses
+                             history_messages_key="chat_history",  # matches what your prompt uses
+                             history_factory_config=[
+                    ConfigurableFieldSpec(
+                        id="user_id",
+                        annotation=str,
+                        name="User ID",
+                        description="Unique identifier for the user.",
+                        default="",
+                        is_shared=True,
+                    ),
+                    ConfigurableFieldSpec(
+                        id="session_id",
+                        annotation=str,
+                        name="Session ID",
+                        description="Unique identifier for the session.",
+                        default="",
+                        is_shared=True,
+                    ),
+                ]
         )
         
         return agent_with_memory
     
-    def answer_questions(self, question: str, session_id: str = "default"):
+    def answer_questions(self, question: str, userID: str, session_id: str = "default"):
         """
         Answer questions using the agent.
         
         Args:
             question: The question to answer
+            userID: User ID for conversation history
             session_id: Session ID for conversation history
             
         Returns:
@@ -134,7 +153,7 @@ Question: {input}
         # Use the agent to answer the question
         response = self.agent_executor_with_memory.invoke(
             {"input": question},
-            config={"configurable": {"session_id": session_id}}
+            config={"configurable": {"user_id": userID, "session_id": session_id}}
         )
         
         return response
