@@ -1,0 +1,15 @@
+langchain>=0.3.26
+ollama>=0.5.1
+litellm==1.73.6.post1
+langchain-community
+langchain-ollama
+langchain-openai
+langchain-chroma
+chromadb
+sentence-transformers
+langchain-huggingface
+numpy<2
+pytest
+pypdf
+python-dotenv
+google-search-results
