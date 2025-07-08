@@ -2,7 +2,7 @@ from retrievers.vector_store_factory import get_vector_store
 import os
 
 
-class DataInjestor:
+class DataIngestor:
     
     def __init__(self, directory_path: str, vector_store: str, embedding_provider: str, embedding_model: str):
         self.directory_path = directory_path
