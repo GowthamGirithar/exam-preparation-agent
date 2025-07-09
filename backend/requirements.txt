@@ -13,3 +13,4 @@ pytest
 pypdf
 python-dotenv
 google-search-results
+fastapi

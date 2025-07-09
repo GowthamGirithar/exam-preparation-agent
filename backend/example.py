@@ -43,6 +43,9 @@ for chunk in response:
 
 '''
 
+
+
+
 law_agent_dynamic = ModernDynamicLawAgentWithSessionMemory(llm_provider="ollama", llm_model="llama3", llm_host="http://localhost:11434", tools=["english_search_document", "search_web"])
 
 # First question
@@ -60,3 +63,4 @@ print()
 # Check chat history
 print("=== Chat History ===")
 print("Chat history:", response.get('chat_history', []))
+
