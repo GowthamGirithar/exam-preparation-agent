@@ -5,8 +5,8 @@ load_dotenv()
 
 class Config:
     # LLM Configuration
-    OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-    OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
+    LLM_HOST = os.getenv("LLM_HOST", "http://localhost:11434")
+    LLM_MODEL = os.getenv("LLM_MODEL", "llama3")
     LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
     
     # API Keys
@@ -24,6 +24,7 @@ class Config:
     LAW_COLLECTION = os.getenv("LAW_COLLECTION", "law")
     
     # Agent Configuration
+    AGENT_NAME = os.getenv("AGENT_NAME", "DynamicLawAgent")
     MAX_ITERATIONS = int(os.getenv("MAX_ITERATIONS", "5"))
     VERBOSE_MODE = os.getenv("VERBOSE_MODE", "true").lower() == "true"
     SEARCH_RESULTS_LIMIT = int(os.getenv("SEARCH_RESULTS_LIMIT", "3"))

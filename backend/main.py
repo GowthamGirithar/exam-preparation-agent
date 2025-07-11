@@ -3,12 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from agents.modern_dynamic_law_agent_session_memory import ModernDynamicLawAgentWithSessionMemory
 from config import Config
 from pydantic import BaseModel
+from agents.agent_factory import get_agent
+
 
 
 
 app = FastAPI()
-agent = ModernDynamicLawAgentWithSessionMemory(llm_provider=Config.LLM_PROVIDER, llm_model=Config.OLLAMA_MODEL, llm_host=Config.OLLAMA_HOST, tools=["english_search_document", "search_web"])
-
+agent = get_agent()
 
 app.add_middleware(
     CORSMiddleware,
