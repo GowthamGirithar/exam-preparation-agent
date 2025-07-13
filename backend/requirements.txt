@@ -14,3 +14,4 @@ pypdf
 python-dotenv
 google-search-results
 fastapi
+langsmith

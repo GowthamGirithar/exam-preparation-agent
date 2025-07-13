@@ -29,6 +29,23 @@ class Config:
     VERBOSE_MODE = os.getenv("VERBOSE_MODE", "true").lower() == "true"
     SEARCH_RESULTS_LIMIT = int(os.getenv("SEARCH_RESULTS_LIMIT", "3"))
     
+    # LangSmith Configuration
+    LANGSMITH_API_KEY = os.getenv("LANGSMITH_API_KEY")
+    LANGSMITH_PROJECT = os.getenv("LANGSMITH_PROJECT", "law-exam-agent-evaluation")
+    LANGSMITH_API_URL = os.getenv("LANGSMITH_API_URL", "https://api.smith.langchain.com")
+    
+    # Evaluation Thresholds
+    EVALUATION_THRESHOLDS = {
+        "correctness": float(os.getenv("CORRECTNESS_THRESHOLD", "0.75")),
+        "tool_selection_accuracy": float(os.getenv("TOOL_SELECTION_THRESHOLD", "0.90")),
+        "relevance": float(os.getenv("RELEVANCE_THRESHOLD", "0.80")),
+        "completeness": float(os.getenv("COMPLETENESS_THRESHOLD", "0.70")),
+        "memory_retention": float(os.getenv("MEMORY_RETENTION_THRESHOLD", "0.85"))
+    }
+
+    # Evaluation Local - determine whether to run custom evaluation or using langsmith
+    EVALUATION_LOCAL = os.getenv("EVALUATION_LOCAL", "true").strip().lower() == "true"
+    
     @classmethod
     def validate(cls):
         """Validate required configuration"""
