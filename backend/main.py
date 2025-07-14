@@ -4,6 +4,9 @@ from agents.modern_dynamic_law_agent_session_memory import ModernDynamicLawAgent
 from config import Config
 from pydantic import BaseModel
 from agents.agent_factory import get_agent
+from ingestion.ingest import get_data_ingestor
+
+
 
 
 
@@ -30,3 +33,8 @@ async def chat(input: ChatInput):
     response = agent.answer_questions(input.question, input.user_id, input.session_id)
     return {"response": response.get('output', response), "chat_history": response.get('chat_history', [])}
 
+
+@app.post("/load_data", description="Load the data into vector DB")
+async def chat():
+    response = get_data_ingestor().ingest_data()
+    return {"is_success": response}
