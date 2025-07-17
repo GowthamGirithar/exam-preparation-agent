@@ -35,6 +35,15 @@ async def chat(input: ChatInput):
 
 
 @app.post("/load_data", description="Load the data into vector DB")
-async def chat():
+async def load_data():
     response = get_data_ingestor().ingest_data()
     return {"is_success": response}
+
+
+# Note: Learning functionality is now integrated into the main /chat endpoint
+# Users can send learning commands like:
+# - "start practice [topic]" 
+# - "answer A/B/C/D"
+# - "my progress"
+# - "explain [topic]"
+# - "end session"
