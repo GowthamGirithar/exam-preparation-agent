@@ -70,5 +70,57 @@ def get_agent():
         
         '''
         return ModernDynamicLawAgentWithSessionMemory(llm_provider=Config.LLM_PROVIDER, llm_model= Config.LLM_MODEL,llm_host=Config.LLM_HOST, tools=["english_search_document", "search_web"])
+    elif Config.AGENT_NAME == "InteractiveLearningAgent":
+        from agents.interactive_learning_agent import InteractiveLearningAgent
+        
+        '''
+        Interactive Learning Agent with adaptive question generation and performance tracking.
+        
+        Features:
+        - All existing agent capabilities (document search, web search, session memory)
+        - Adaptive question generation from PDF content
+        - Performance tracking and analytics
+        - Learning session management
+        - Topic explanations
+        
+        Example usage:
+        
+        learning_agent = InteractiveLearningAgent(
+            llm_provider="ollama",
+            llm_model="llama3",
+            llm_host="http://localhost:11434",
+            tools=["english_search_document", "search_web"]
+        )
+        
+        # Start practice session
+        response = learning_agent.answer_questions("start practice Grammar", "123", "session_1")
+        print("Response:", response.get('output'))
+        
+        # Submit answer
+        response = learning_agent.answer_questions("answer A", "123", "session_1")
+        print("Response:", response.get('output'))
+        
+        # Check progress
+        response = learning_agent.answer_questions("my progress", "123", "session_1")
+        print("Response:", response.get('output'))
+        
+        # Regular question (uses existing tools)
+        response = learning_agent.answer_questions("What is contract law?", "123", "session_1")
+        print("Response:", response.get('output'))
+        '''
+        return InteractiveLearningAgent(
+            llm_provider=Config.LLM_PROVIDER,
+            llm_model=Config.LLM_MODEL,
+            llm_host=Config.LLM_HOST,
+            tools=[
+                "english_search_document", 
+                "search_web",
+                "start_practice_session",
+                "get_practice_question", 
+                "submit_practice_answer",
+                "get_learning_progress",
+                "get_adaptive_question"
+            ]
+        )
     else:
         raise ValueError(f"Unknown agent name: {Config.AGENT_NAME}")
