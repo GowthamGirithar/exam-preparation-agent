@@ -5,7 +5,32 @@ from langchain_community.tools.google_serper.tool import GoogleSerperAPIWrapper
 from config import Config
 import json
 import uuid
-from typing import Optional
+from typing import Optional, Dict, Any
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+def parse_tool_input(raw_input: Any, tool_name: str = "") -> Dict[str, Any]:
+    """
+    Simple helper to parse tool input for Ollama models.
+    Handles the case where LangChain passes entire JSON as first parameter.
+    """
+    
+    if isinstance(raw_input, str) and raw_input.strip().startswith('{'):
+            try:
+                parsed = json.loads(raw_input.strip())
+                logger.info(f"[{tool_name}] Parsed JSON: {parsed}")
+                return parsed
+            except json.JSONDecodeError:
+                logger.warning(f"[{tool_name}] JSON parsing failed, using as string")
+                return {"query": raw_input}
+    else :
+            return raw_input
+
+
 
 
 class SearchInput(BaseModel):
@@ -13,63 +38,52 @@ class SearchInput(BaseModel):
     max_results: int = Field(default=5, description="maximum number of results to return")
 
 
-@tool("english_search_document", args_schema=SearchInput, description="Use this tool for any learning related to English grammar, vocabulary, comprehension passages, and language skills for CLAT exam and not for practising questions")
-# description of method with args is important for agent to understand this tool
-def english_document_search(query: str, max_results: int = 5):
-       """Search English language study materials for CLAT exam preparation.
-       
-       Use this tool ONLY for:
-       - English grammar questions (tenses, parts of speech, sentence structure)
-       - Vocabulary and word meanings
-       - Reading comprehension passages and techniques
-       - English language skills and rules
-       
-       DO NOT use for current events, general knowledge, or factual questions about people/places.
+@tool("english_search_document", 
+      args_schema=SearchInput if Config.TOOL_SCHEMA_VALIDATION else None,
+      description="Use this tool for any learning related to English grammar, vocabulary, comprehension passages, and language skills for CLAT exam and not for practising questions")
+def english_document_search(query_or_json, max_results: int = 5):
+    """Search English language study materials for CLAT exam preparation."""
     
-    Args:
-        query: English language topic to search for (grammar, vocabulary, comprehension)
-        max_results: the number of similar documents to return (default: 5)
-    """
+    # Parse input only for Ollama mode (when validation is off)
+    if not Config.TOOL_SCHEMA_VALIDATION:
+        params = parse_tool_input(query_or_json, "english_search_document")
+        query_or_json = params.get("query", str(query_or_json))
+        max_results = params.get("max_results", max_results)
+    
+    try:
+        vector_store = get_vector_store(
+            provider_name=Config.VECTOR_STORE_PROVIDER,
+            embedding_provider=Config.EMBEDDING_PROVIDER,
+            embedding_model=Config.DEFAULT_EMBEDDING_MODEL,
+            collection_name=Config.ENGLISH_COLLECTION
+        )
+        results = vector_store.get_chroma_retriever(top_k=max_results).invoke(query_or_json)
+        logger.info(f"English search returned {len(results)} results for query: {query_or_json}")
+        return results
+    except Exception as e:
+        logger.error(f"English search error: {e}")
+        return str(e)
 
-       try:
-            vector_store = get_vector_store(provider_name=Config.VECTOR_STORE_PROVIDER,
-                                                 embedding_provider=Config.EMBEDDING_PROVIDER,
-                                                 embedding_model=Config.DEFAULT_EMBEDDING_MODEL,
-                                                 collection_name=Config.ENGLISH_COLLECTION)
-            # Pass max_results to the retriever instead of filtering afterwards
-            results = vector_store.get_chroma_retriever(top_k=max_results).invoke(query)
-            print(f"the length of resources is {len(results)}")
-            return results
-       except Exception as e:
-            return str(e)
 
 @tool("search_web", description="Search the web for current information, facts, news, and general knowledge")
-def search_web(query: str) -> str:
-    """Search the web for current information, facts, news, and general knowledge.
+def search_web(query_or_json: str) -> str:
+    """Search the web for current information, facts, news, and general knowledge."""
     
-    Use this tool for:
-    - Current events and news
-    - Factual questions about people, places, organizations
-    - General knowledge questions
-    - Information not related to English language skills
+    # Parse input only for Ollama mode (when validation is off)
+    if not Config.TOOL_SCHEMA_VALIDATION:
+        params = parse_tool_input(query_or_json, "search_web")
+        query_or_json = params.get("query", str(query_or_json))
     
-    Input should be a search query string."""
-    try:
-        # Configure serper to get more focused results
-        Config.validate()  # Ensure API key is available
+    try:      
         serper = GoogleSerperAPIWrapper(
             serper_api_key=Config.GOOGLE_SERPER_API_KEY,
-            k=Config.SEARCH_RESULTS_LIMIT,  # Use config value
+            k=Config.SEARCH_RESULTS_LIMIT,
         )
-        
-        # Get the parsed response (this uses _parse_snippets internally)
-        # serper.results(query) to see full response
-        response = serper.run(query)
-        print("Serper response:", response)
-        print("\n")
+        response = serper.run(query_or_json)
+        logger.info(f"Web search completed for query: {query}")
         return response
-        
     except Exception as e:
+        logger.error(f"Web search error: {e}")
         return f"Error searching web: {str(e)}"
 
 
@@ -93,23 +107,19 @@ class UserInput(BaseModel):
     user_id: str = Field(description="Unique identifier for the user")
 
 
-@tool("start_practice_session", args_schema=PracticeSessionInput, description="Provide number of questions user asked to practice for CLAT on specific topics")
-def start_practice_session(user_id: str, topic: Optional[str] = None, target_questions: int = 10) -> str:
-    """Start an adaptive practice session for CLAT exam preparation.
+@tool("start_practice_session", 
+      args_schema=PracticeSessionInput if Config.TOOL_SCHEMA_VALIDATION else None,
+      description="Provide number of questions user asked to practice for CLAT on specific topics")
+def start_practice_session(user_id="1", topic: Optional[str] = None, target_questions: int = 10) -> str:
+    """Start an adaptive practice session for CLAT exam preparation."""
     
-    Use this tool when users want to:
-    - Practice questions on specific topics
-    - Start learning sessions
-    - Begin adaptive practice based on their weaknesses
-    
-    Args:
-        user_id: Unique identifier for the user
-        topic: Optional topic to focus on (Grammar, Legal Principles, Indian History, etc.)
-        target_questions: Number of questions in the session (default: 10)
-    
-    Returns:
-        JSON string with session info and first question
-    """
+    # Parse input only for Ollama mode (when validation is off)
+    if not Config.TOOL_SCHEMA_VALIDATION:
+        params = parse_tool_input(user_id, "start_practice_session")
+        user_id = params.get("user_id", "1")
+        topic = params.get("topic", topic)
+        target_questions = params.get("target_questions", target_questions)
+
     try:
         # Import here to avoid circular imports
         from learning.question_manager import QuestionManager
@@ -182,8 +192,9 @@ def start_practice_session(user_id: str, topic: Optional[str] = None, target_que
 
 
 # parse_docstring validates the input automatically based on the function arges mentined as comment 
-@tool("get_practice_question", parse_docstring=True)
-def get_practice_question(user_id: str, topic: str, difficulty: str = "medium") -> str:
+# parse_docstring=True,
+@tool("get_practice_question",  description="Get a specific practice question by topic and difficulty for CLAT preparation")
+def get_practice_question(user_id: str=1, topic: str="Grammar", difficulty: str = "medium") -> str:
     """Get a specific practice question by topic and difficulty for CLAT preparation.
     
     Use this tool when users want:
@@ -199,16 +210,18 @@ def get_practice_question(user_id: str, topic: str, difficulty: str = "medium") 
     Returns:
         JSON string with question details
     """
-    
+    print(f"[DEBUG] Parsed JSON {user_id}- topic: {topic}, difficulty: {difficulty}")
     # Handle the case where entire JSON is passed as topic parameter
     # TODO: due to bug on langchain as it takes overload from ollama
-    if isinstance(topic, str) and topic.strip().startswith('{'):
+    if isinstance(user_id, str) and user_id.strip().startswith('{'):
         try:
             # Parse the JSON that was incorrectly passed as topic
-            params = json.loads(topic.strip())
+            params = json.loads(user_id.strip())
+            actual_user_id = params.get('user_id', '1')
             actual_topic = params.get('topic', 'Grammar')
             actual_difficulty = params.get('difficulty', 'medium')
-            print(f"[DEBUG] Parsed JSON - topic: {actual_topic}, difficulty: {actual_difficulty}")
+            print(f"[DEBUG] Parsed JSON{actual_user_id} - topic: {actual_topic}, difficulty: {actual_difficulty}")
+            user_id= actual_user_id
             topic = actual_topic
             difficulty = actual_difficulty
         except json.JSONDecodeError:
@@ -224,7 +237,7 @@ def get_practice_question(user_id: str, topic: str, difficulty: str = "medium") 
         
         questions = question_manager.get_question_by_topic(topic, difficulty, 1)
         question = questions[0] if questions else None
-        
+            
         if question:
             # Store as current question
             if user_id not in active_learning_sessions:
@@ -262,8 +275,8 @@ def get_practice_question(user_id: str, topic: str, difficulty: str = "medium") 
         })
 
 
-@tool("submit_practice_answer", args_schema=AnswerInput, description="Submit an answer to the current practice question")
-def submit_practice_answer(user_id: str, answer: str) -> str:
+@tool("submit_practice_answer",args_schema=AnswerInput if Config.TOOL_SCHEMA_VALIDATION else None, description="Submit an answer to the current practice question",)
+def submit_practice_answer(user_id: str = "1", answer: str="A") -> str:
     """Submit an answer to the current practice question.
     
     Use this tool when users provide their answer to a practice question.
@@ -275,6 +288,12 @@ def submit_practice_answer(user_id: str, answer: str) -> str:
     Returns:
         JSON string with answer feedback and next question (if available)
     """
+    if not Config.TOOL_SCHEMA_VALIDATION:
+        params = parse_tool_input(user_id, "start_practice_session")
+        user_id = params.get('user_id', '1')
+        answer = params.get('answer', 'A')
+       
+    
     try:
         if user_id not in active_learning_sessions or not active_learning_sessions[user_id].get("current_question"):
             return json.dumps({
@@ -361,7 +380,7 @@ def submit_practice_answer(user_id: str, answer: str) -> str:
         })
 
 
-@tool("get_learning_progress", args_schema=UserInput, description="Get user's learning progress and performance analytics")
+@tool("get_learning_progress",description="Get user's learning progress and performance analytics")
 def get_learning_progress(user_id: str) -> str:
     """Get user's learning progress and performance analytics.
     
@@ -376,6 +395,10 @@ def get_learning_progress(user_id: str) -> str:
     Returns:
         JSON string with performance analytics
     """
+    if not Config.TOOL_SCHEMA_VALIDATION:
+        params = parse_tool_input(user_id, "get_learning_progress")
+        user_id = params.get('user_id', '1')
+    
     try:
         from database.crud import get_user_weaknesses
         from database.database import get_db
@@ -435,7 +458,7 @@ def get_learning_progress(user_id: str) -> str:
         })
 
 
-@tool("get_adaptive_question", args_schema=UserInput, description="Get an adaptive question based on user's performance and weaknesses")
+@tool("get_adaptive_question",  description="Get an adaptive question based on user's performance and weaknesses")
 def get_adaptive_question(user_id: str) -> str:
     """Get an adaptive question based on user's performance and weaknesses.
     
@@ -450,6 +473,10 @@ def get_adaptive_question(user_id: str) -> str:
     Returns:
         JSON string with adaptive question
     """
+    if not Config.TOOL_SCHEMA_VALIDATION:
+        params = parse_tool_input(user_id, "get_adaptive_question")
+        user_id = params.get('user_id', '1')    
+
     try:
         from learning.question_manager import QuestionManager
         from database.database import get_db

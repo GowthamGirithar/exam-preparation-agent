@@ -46,8 +46,26 @@ class Config:
     # Evaluation Local - determine whether to run custom evaluation or using langsmith
     EVALUATION_LOCAL = os.getenv("EVALUATION_LOCAL", "true").strip().lower() == "true"
     
+    # Tool Schema Validation - controls whether to use Pydantic schemas or manual parsing
+    # Automatically set based on LLM provider if not explicitly provided
+    # Set to True for OpenAI models (proper function calling), False for Ollama models (manual parsing)
+    _tool_schema_validation_env = os.getenv("TOOL_SCHEMA_VALIDATION")
+    if _tool_schema_validation_env is None:
+        # Only set default if not explicitly provided in environment
+        TOOL_SCHEMA_VALIDATION = LLM_PROVIDER == "openai"
+    else:
+        # Respect explicit environment variable setting
+        TOOL_SCHEMA_VALIDATION = _tool_schema_validation_env.strip().lower() == "true"
+    
+    # Universal API Key for any LLM provider (OpenAI, Anthropic, etc.)
+    LLM_PROVIDER_API_KEY = os.getenv("LLM_PROVIDER_API_KEY") or os.getenv("OPENAI_API_KEY")
+    
     @classmethod
     def validate(cls):
         """Validate required configuration"""
         if not cls.GOOGLE_SERPER_API_KEY:
             raise ValueError("GOOGLE_SERPER_API_KEY is required")
+        
+        # Validate API key when using providers that require it
+        if cls.LLM_PROVIDER in ["openai", "anthropic", "azure"] and not cls.LLM_PROVIDER_API_KEY:
+            raise ValueError(f"LLM_PROVIDER_API_KEY is required when using {cls.LLM_PROVIDER} provider")
