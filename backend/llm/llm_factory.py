@@ -29,7 +29,8 @@ def get_llm(provider: str, model: str, baseURL: str, api_key: str = None) -> Uni
     if provider == "ollama":
         # Ollama doesn't need API keys, uses local models
         logger.info(f"Using Ollama LLM with base URL: {baseURL}")
-        return OllamaLLM(model=model, base_url=baseURL, temperature=0)
+        # OllamaLLM(model=model, base_url=baseURL, temperature=0)
+        return ChatOllama(model=model, base_url=baseURL, temperature=0)
     
     elif provider == "openai":
         # OpenAI ChatGPT models - requires API key

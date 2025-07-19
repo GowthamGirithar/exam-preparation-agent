@@ -20,6 +20,8 @@ from database.init_db import init_database
 from config import Config
 import json
 
+from dotenv import load_dotenv
+load_dotenv()
 
 def test_interactive_learning_agent():
     """Test the complete Interactive Learning Agent workflow."""
@@ -42,54 +44,52 @@ def test_interactive_learning_agent():
         print(f"❌ Agent initialization failed: {e}")
         return
     
+    print("\n🎯 Starting Interactive 5-Question Practice Session")
     # Test user and session
-    test_user_id = "999"
+    test_user_id = "1"
     test_session_id = "test_session_123"
-    
-    print(f"\n👤 Testing with User ID: {test_user_id} and session id {test_session_id}")
+    # Start the session
+    try:
+        response = agent.answer_questions("start practice Grammar with 5 questions", test_user_id, test_session_id)
+        print(f"🟢 Session Started: {response.get('output', response)}")
+    except Exception as e:
+        print(f"❌ Failed to start practice session: {e}")
+        exit(1)
 
-    #  Start practice session
-    print("TEST 2: Start Practice Session \n")
-    
-    
-    '''
-    try:
-        response = agent.answer_questions("start practice Grammar", test_user_id, test_session_id)
-        print(response.get('output', response))
-    except Exception as e:
-        print(f"❌ Practice session test failed: {e}")
-    '''   
-    
-    # Test 3: Get specific question
-    print("TEST 3: Get Specific Question \n")
-    
-    try:
-        response = agent.answer_questions("get me question Grammar easy", test_user_id, test_session_id)
-        print(response.get('output', response))
-    except Exception as e:
-        print(f"❌ Specific question test failed: {e}")
-    
-    # Test 4: Submit answers
-    print("TEST 4: Submit Answers\n")
-    
-    answers = ['A', 'B', 'C', 'A']  # Mix of correct/incorrect
-    for i, answer in enumerate(answers, 1):
+    # Now go into the Q&A loop
+    MAX_QUESTIONS = 5
+    question_number = 0
+    answers = ['A', 'B', 'C', 'D', 'A']  # Simulated choices
+
+    while question_number < MAX_QUESTIONS:
         try:
+            # Submit answer
+            answer = answers[question_number]
+            print(f"\n📝 Submitting Answer {question_number + 1}: {answer}")
             response = agent.answer_questions(f"answer {answer}", test_user_id, test_session_id)
-            print(response.get('output', response))
-        except Exception as e:
-            print(f"❌ Answer {i} submission failed: {e}")
-    
-    # Test 5: Check progress
-    print("TEST 5: User Progress Analytics\n")
 
-    
+            output = response.get('output', response)
+            print(f"📩 Agent Response: {output}")
+
+            # Check if session is complete (agent may say so in the response)
+            if "session complete" in str(output).lower() or "you've completed" in str(output).lower():
+                print("✅ Session ended by agent.")
+                break
+
+            question_number += 1
+
+        except Exception as e:
+            print(f"❌ Error during question {question_number + 1}: {e}")
+            break
+
+        # Check progress
+    print("\n📊 Checking User Progress")
     try:
         response = agent.answer_questions("my progress", test_user_id, test_session_id)
-        print(response.get('output', response))
+        print(f"📈 Progress: {response.get('output', response)}")
     except Exception as e:
-        print(f"❌ Progress analytics test failed: {e}")
-    
+        print(f"❌ Could not retrieve progress: {e}")
+
     # Test 6: Topic explanation
     print("TEST 6: Topic Explanation\n")
     
