@@ -47,8 +47,7 @@ class InteractiveLearningAgent:
         
         # Create simplified prompt template that relies on tool descriptions
         self.prompt = PromptTemplate.from_template(
-            """You are an intelligent CLAT (Common Law Admission Test) preparation assistant with autonomous learning capabilities.
-
+            """You are a helpful, reasoning-focused CLAT preparation tutor that answers user questions, guides them through MCQs, tracks their progress, and explains legal concepts clearly. Use the tools below whenever helpful.
 Available tools:
 {tools}
 
@@ -60,6 +59,8 @@ Action: the action to take, should be one of [{tool_names}]
 Action Input: the input to the action in JSON format
 Observation: the result of the action
 ... (this Thought/Action/Action Input/Observation can repeat N times)
+
+**Important: If you provide a practice question, do not answer it yourself. Wait for the user's response.**
 
 Thought: I now know the final answer
 Final Answer: <your answer here>
@@ -91,7 +92,7 @@ Question: {input}
             verbose=Config.VERBOSE_MODE,
             handle_parsing_errors=True,
             max_iterations=Config.MAX_ITERATIONS,
-            return_intermediate_steps=True,
+            return_intermediate_steps=False,
         )
 
         # Wrap with memory

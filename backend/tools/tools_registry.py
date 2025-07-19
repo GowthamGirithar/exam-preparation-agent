@@ -275,7 +275,10 @@ def get_practice_question(user_id: str=1, topic: str="Grammar", difficulty: str 
         })
 
 
-@tool("submit_practice_answer",args_schema=AnswerInput if Config.TOOL_SCHEMA_VALIDATION else None, description="Submit an answer to the current practice question",)
+@tool("submit_practice_answer",args_schema=AnswerInput if Config.TOOL_SCHEMA_VALIDATION else None,
+       description= ("Submit an answer to the current practice question"
+                     "The answer must be only a single letter: A, B, C, or D — do not include full option text."
+))
 def submit_practice_answer(user_id: str = "1", answer: str="A") -> str:
     """Submit an answer to the current practice question.
     

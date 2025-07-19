@@ -670,7 +670,7 @@ class QuestionManager:
         questions = []
         topic_questions = fallback_questions.get(topic, [])
         
-        for i, q_data in enumerate(topic_questions[:limit]):
+        for i, q_data in enumerate(topic_questions):
             if difficulty != "any" and q_data.get("difficulty", "medium") != difficulty:
                 continue
                 
@@ -690,6 +690,8 @@ class QuestionManager:
                 }
             )
             questions.append(question)
+            if len(questions) >= limit:
+                break
         
         return questions
     
