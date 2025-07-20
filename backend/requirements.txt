@@ -15,6 +15,7 @@ python-dotenv
 google-search-results
 fastapi
 langsmith
+langgraph>=0.2.0
 
 # Database Dependencies for Learning System
 sqlalchemy>=2.0.0  # ORM for database operations and model definitions

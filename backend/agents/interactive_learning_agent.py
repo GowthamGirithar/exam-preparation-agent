@@ -30,6 +30,12 @@ class InteractiveLearningAgent:
     - Performance tracking and analytics
     - Topic explanations with examples
     - Learning session management
+
+    Issue : 
+    a. React agent is answering the question and not allowing users to ans . Even control is not returned to client code to submit ans.
+    b. Tool input parameter are not passed correctly even when open ai used
+    c. we need to enable skip validation for tools input schema
+
     """
     
     def __init__(self, llm_provider: str, llm_model: str, llm_host: str, tools: list[str]):
@@ -61,6 +67,9 @@ Observation: the result of the action
 ... (this Thought/Action/Action Input/Observation can repeat N times)
 
 **Important: If you provide a practice question, do not answer it yourself. Wait for the user's response.**
+When starting a practice session, provide the first question to the user and wait. Do NOT submit any answers by yourself until the user provides a valid answer.
+After the user answers, call submit_practice_answer with the answer, then provide feedback and next question.
+Keep this question-answer loop until all questions are done.
 
 Thought: I now know the final answer
 Final Answer: <your answer here>
