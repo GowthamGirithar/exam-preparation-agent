@@ -47,16 +47,9 @@ class Config:
     EVALUATION_LOCAL = os.getenv("EVALUATION_LOCAL", "true").strip().lower() == "true"
     
     # Tool Schema Validation - controls whether to use Pydantic schemas or manual parsing
-    # Automatically set based on LLM provider if not explicitly provided
-    # Set to True for OpenAI models (proper function calling), False for Ollama models (manual parsing)
-    _tool_schema_validation_env = os.getenv("TOOL_SCHEMA_VALIDATION")
-    if _tool_schema_validation_env is None:
-        # Only set default if not explicitly provided in environment
-        TOOL_SCHEMA_VALIDATION = LLM_PROVIDER == "openai"
-    else:
-        # Respect explicit environment variable setting
-        TOOL_SCHEMA_VALIDATION = _tool_schema_validation_env.strip().lower() == "true"
-    
+    # Set to True for langgraph
+    TOOL_SCHEMA_VALIDATION = os.getenv("TOOL_SCHEMA_VALIDATION").strip().lower() == "true"
+
     # Universal API Key for any LLM provider (OpenAI, Anthropic, etc.)
     LLM_PROVIDER_API_KEY = os.getenv("LLM_PROVIDER_API_KEY") or os.getenv("OPENAI_API_KEY")
     

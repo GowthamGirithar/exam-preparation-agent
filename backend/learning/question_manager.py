@@ -601,7 +601,7 @@ class QuestionManager:
         These are high-quality sample questions for each CLAT topic.
         """
         fallback_questions = {
-            "Grammar": [
+            "GRAMMAR": [
                 {
                     "text": "Choose the correct sentence:",
                     "options": ["A) He don't like coffee", "B) He doesn't likes coffee", "C) He doesn't like coffee", "D) He not like coffee"],
@@ -617,7 +617,7 @@ class QuestionManager:
                     "difficulty": "medium"
                 }
             ],
-            "Vocabulary": [
+            "VOCABULARY": [
                 {
                     "text": "What is the synonym of 'happy'?",
                     "options": ["A) Joyful", "B) Sad", "C) Angry", "D) Tired"],
@@ -633,7 +633,7 @@ class QuestionManager:
                     "difficulty": "medium"
                 }
             ],
-            "Indian History": [
+            "INDIAN HISTORY": [
                 {
                     "text": "Who was the first President of India?",
                     "options": ["A) Jawaharlal Nehru", "B) Dr. Rajendra Prasad", "C) Sardar Patel", "D) Dr. A.P.J. Abdul Kalam"],
@@ -649,7 +649,7 @@ class QuestionManager:
                     "difficulty": "medium"
                 }
             ],
-            "Legal Principles": [
+            "LEGAL PRINCIPLES": [
                 {
                     "text": "Principle: A person is liable for negligence if they fail to take reasonable care. Facts: A doctor operates without proper sterilization. Is the doctor liable?",
                     "options": ["A) Yes, due to negligence", "B) No, it's an accident", "C) Only if patient dies", "D) Depends on hospital policy"],
@@ -668,7 +668,7 @@ class QuestionManager:
         }
         
         questions = []
-        topic_questions = fallback_questions.get(topic, [])
+        topic_questions = fallback_questions.get(topic.upper(), [])
         
         for i, q_data in enumerate(topic_questions):
             if difficulty != "any" and q_data.get("difficulty", "medium") != difficulty:

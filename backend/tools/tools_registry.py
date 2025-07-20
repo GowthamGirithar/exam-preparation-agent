@@ -193,7 +193,7 @@ def start_practice_session(user_id="1", topic: Optional[str] = None, target_ques
 
 # parse_docstring validates the input automatically based on the function arges mentined as comment 
 # parse_docstring=True,
-@tool("get_practice_question",  description="Get a specific practice question by topic and difficulty for CLAT preparation")
+@tool("get_practice_question", args_schema=PracticeSessionInput if Config.TOOL_SCHEMA_VALIDATION else None, description="Get a specific practice question by topic and difficulty for CLAT preparation")
 def get_practice_question(user_id: str=1, topic: str="Grammar", difficulty: str = "medium") -> str:
     """Get a specific practice question by topic and difficulty for CLAT preparation.
     
@@ -276,7 +276,7 @@ def get_practice_question(user_id: str=1, topic: str="Grammar", difficulty: str 
 
 
 @tool("submit_practice_answer",args_schema=AnswerInput if Config.TOOL_SCHEMA_VALIDATION else None,
-       description= ("Submit an answer to the current practice question"
+       description= ("This tool is used to submit an answer to the current practice question. "
                      "The answer must be only a single letter: A, B, C, or D — do not include full option text."
 ))
 def submit_practice_answer(user_id: str = "1", answer: str="A") -> str:

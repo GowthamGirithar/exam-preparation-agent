@@ -164,7 +164,7 @@ class AutonomousLangGraphAgent:
             response = self.llm.invoke(messages)
             plan_text = response.content.strip()
             
-            logger.info(f"PLANNER: LLM response: {plan_text[:200]}...")
+            logger.info(f"PLANNER: LLM response: {plan_text[:500]}...")
             
             # Parse the plan
             if plan_text.startswith('{') and plan_text.endswith('}'):
@@ -279,7 +279,7 @@ class AutonomousLangGraphAgent:
             try:
                 result = self._execute_single_tool(tool_name, parameters)
                 logger.info(f"EXECUTOR: Tool {tool_name} succeeded")
-                logger.info(f"EXECUTOR: Result preview: {str(result)[:200]}...")
+                logger.info(f"EXECUTOR: Result preview: {str(result)[:500]}...")
                 
                 results.append({
                     "tool_name": tool_name,
@@ -465,12 +465,22 @@ class AutonomousLangGraphAgent:
         descriptions = []
         for tool in self.tools:
             param_desc = []
-            for param_name, param_info in tool.parameters.items():
-                param_desc.append(f"    - {param_name}: {param_info['description']} (type: {param_info['type']})")
-            params_text = "\n".join(param_desc) if param_desc else "    None"
+
+            if hasattr(tool, "args_schema") and tool.args_schema:
+                # Pydantic v2 - Use model_fields
+                for param_name, field in tool.args_schema.model_fields.items():
+                    description = field.description or "No description"
+                    type_name = field.annotation.__name__ if hasattr(field.annotation, '__name__') else str(field.annotation)
+                    param_desc.append(f"    - {param_name}: {description} (type: {type_name})")
+            else:
+                param_desc.append("    None")
+
+            params_text = "\n".join(param_desc)
             descriptions.append(
                 f"- {tool.name}: {tool.description}\n  Parameters:\n{params_text}"
             )
+
+        logger.info(f"Tool descriptions: {descriptions}")
         return "\n".join(descriptions)
     
     """ answer_questions is the conversation agent interface"""
