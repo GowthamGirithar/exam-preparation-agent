@@ -210,7 +210,7 @@ def get_user_weaknesses(db: Session, user_id: int, limit: int = 5) -> List[Dict[
     """Get user's weakest topics for adaptive learning."""
     performances = db.query(UserPerformance).filter(
         UserPerformance.user_id == user_id,
-        UserPerformance.total_questions >= 3  # Minimum questions for reliable data
+        UserPerformance.total_questions >= 1  # Minimum questions for reliable data
     ).order_by(desc(UserPerformance.weakness_score)).limit(limit).all()
     
     weaknesses = []

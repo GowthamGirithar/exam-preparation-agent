@@ -111,6 +111,13 @@ class AnswerInput(BaseModel):
 class UserInput(BaseModel):
     user_id: str = Field(description="Unique identifier for the user")
 
+class LearningProgressInput(BaseModel):
+    user_id: str = Field(description="Unique identifier for the user")
+
+
+
+
+
 
 @tool("start_practice_session", 
       args_schema=PracticeSessionInput if Config.TOOL_SCHEMA_VALIDATION else None,
@@ -405,7 +412,8 @@ def submit_practice_answer(user_id: str = "1", answer: str="A") -> str:
         })
 
 
-@tool("get_learning_progress",description="Get user's learning progress and performance analytics")
+@tool("get_learning_progress",args_schema=LearningProgressInput if Config.TOOL_SCHEMA_VALIDATION else None,
+      description="Get user's learning progress and performance analytics")
 def get_learning_progress(user_id: str) -> str:
     """Get user's learning progress and performance analytics.
     
