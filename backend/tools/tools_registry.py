@@ -98,6 +98,11 @@ class PracticeSessionInput(BaseModel):
     topic: Optional[str] = Field(default=None, description="Optional topic to focus on (e.g., Grammar, Legal Principles)")
     target_questions: int = Field(default=10, description="Number of questions in the session")
 
+class PractiseQuestionInput(BaseModel):
+    user_id: str = Field(description="Unique identifier for the user")
+    topic: str = Field(default="Grammar", description="Topic for the question")
+    difficulty: str = Field(default="medium", description="Question difficulty (easy, medium, hard)")
+
 
 class AnswerInput(BaseModel):
     user_id: str = Field(description="Unique identifier for the user")
@@ -193,7 +198,7 @@ def start_practice_session(user_id="1", topic: Optional[str] = None, target_ques
 
 # parse_docstring validates the input automatically based on the function arges mentined as comment 
 # parse_docstring=True,
-@tool("get_practice_question", args_schema=PracticeSessionInput if Config.TOOL_SCHEMA_VALIDATION else None, description="Get a specific practice question by topic and difficulty for CLAT preparation")
+@tool("get_practice_question", args_schema=PractiseQuestionInput if Config.TOOL_SCHEMA_VALIDATION else None, description="Get a specific practice question by topic and difficulty for CLAT preparation")
 def get_practice_question(user_id: str=1, topic: str="Grammar", difficulty: str = "medium") -> str:
     """Get a specific practice question by topic and difficulty for CLAT preparation.
     
@@ -210,22 +215,13 @@ def get_practice_question(user_id: str=1, topic: str="Grammar", difficulty: str 
     Returns:
         JSON string with question details
     """
-    print(f"[DEBUG] Parsed JSON {user_id}- topic: {topic}, difficulty: {difficulty}")
     # Handle the case where entire JSON is passed as topic parameter
-    # TODO: due to bug on langchain as it takes overload from ollama
-    if isinstance(user_id, str) and user_id.strip().startswith('{'):
-        try:
-            # Parse the JSON that was incorrectly passed as topic
-            params = json.loads(user_id.strip())
-            actual_user_id = params.get('user_id', '1')
-            actual_topic = params.get('topic', 'Grammar')
-            actual_difficulty = params.get('difficulty', 'medium')
-            print(f"[DEBUG] Parsed JSON{actual_user_id} - topic: {actual_topic}, difficulty: {actual_difficulty}")
-            user_id= actual_user_id
-            topic = actual_topic
-            difficulty = actual_difficulty
-        except json.JSONDecodeError:
-            print(f"[DEBUG] Failed to parse JSON, using original values")
+    # due to bug on langchain we need to do json parse 
+    if not Config.TOOL_SCHEMA_VALIDATION:
+        params = parse_tool_input(user_id, "get_practice_question")
+        user_id = params.get("user_id", "1")
+        topic = params.get("topic", topic)
+        difficulty = params.get('difficulty', difficulty)
     
     try:
         from learning.question_manager import QuestionManager
@@ -276,32 +272,37 @@ def get_practice_question(user_id: str=1, topic: str="Grammar", difficulty: str 
 
 
 @tool("submit_practice_answer",args_schema=AnswerInput if Config.TOOL_SCHEMA_VALIDATION else None,
-       description= ("This tool is used to submit an answer to the current practice question. "
-                     "The answer must be only a single letter: A, B, C, or D — do not include full option text."
-))
+       description= ("Use this tool to submit the user's answer to any question. Works in two modes: "
+                    "1) Standalone Q&A: Validates answer and provides feedback for any question "
+                    "2) Practice Session: Validates answer and provides next question based on adaptive learning"))
 def submit_practice_answer(user_id: str = "1", answer: str="A") -> str:
-    """Submit an answer to the current practice question.
+    """Submit an answer to a question (works both in practice sessions and standalone Q&A).
     
-    Use this tool when users provide their answer to a practice question.
+    This tool supports two modes:
+    1. Standalone Q&A: If there's a current question but no active practice session,
+       it validates the answer and provides feedback without continuing to next question.
+    2. Practice Session: If in an active practice session, it validates the answer
+       and provides the next question based on adaptive learning.
     
     Args:
         user_id: Unique identifier for the user
         answer: User's answer (A, B, C, or D)
     
     Returns:
-        JSON string with answer feedback and next question (if available)
+        JSON string with answer feedback and optionally next question
     """
     if not Config.TOOL_SCHEMA_VALIDATION:
-        params = parse_tool_input(user_id, "start_practice_session")
+        params = parse_tool_input(user_id, "submit_practice_answer")
         user_id = params.get('user_id', '1')
         answer = params.get('answer', 'A')
        
     
     try:
+        # Check if there's any current question
         if user_id not in active_learning_sessions or not active_learning_sessions[user_id].get("current_question"):
             return json.dumps({
                 "success": False,
-                "message": "No active question. Please start a practice session first."
+                "message": "No active question found. Please ask for a question first using get_practice_question or start a practice session."
             })
         
         user_answer = answer.upper()
@@ -324,9 +325,14 @@ def submit_practice_answer(user_id: str = "1", answer: str="A") -> str:
         correct_answer = question.correct_answer.upper()
         is_correct = user_answer == correct_answer
         
+        # Determine if this is a practice session or standalone Q&A
+        is_practice_session = (session_info.get("target_questions", 0) > 1 and 
+                              session_info.get("db_session_id") is not None)
+        
         # Record answer in database
+        db_session_id = session_info.get("db_session_id", 1)
         record_user_answer(
-            db, session_info.get("db_session_id", 1), user.id,
+            db, db_session_id, user.id,
             question.id, question.topic, question.text,
             user_answer, correct_answer, 30.0, question.difficulty
         )
@@ -339,40 +345,56 @@ def submit_practice_answer(user_id: str = "1", answer: str="A") -> str:
             "is_correct": is_correct,
             "correct_answer": correct_answer,
             "explanation": question.explanation,
-            "progress": {
-                "questions_asked": session_info['questions_asked'],
-                "target_questions": session_info['target_questions']
+            "question_info": {
+                "topic": question.topic,
+                "difficulty": question.difficulty
             }
         }
         
-        # Get next question if in practice session
-        if session_info["questions_asked"] < session_info["target_questions"]:
-            if session_info.get("topic_focus"):
-                questions = question_manager.get_question_by_topic(
-                    session_info.get("topic_focus"), "medium", 1
-                )
-                next_question = questions[0] if questions else None
-            else:
-                next_question = question_manager.get_adaptive_question(user.id)
+        if is_practice_session:
+            # Practice session mode - provide next question if session not complete
+            result["mode"] = "practice_session"
+            result["progress"] = {
+                "questions_asked": session_info['questions_asked'],
+                "target_questions": session_info['target_questions']
+            }
             
-            if next_question:
-                session_info["current_question"] = next_question
-                session_info["questions_asked"] += 1
+            # Check if session should continue
+            if session_info["questions_asked"] < session_info["target_questions"]:
+                if session_info.get("topic_focus"):
+                    questions = question_manager.get_question_by_topic(
+                        session_info.get("topic_focus"), "medium", 1
+                    )
+                    next_question = questions[0] if questions else None
+                else:
+                    next_question = question_manager.get_adaptive_question(user.id)
                 
-                result["next_question"] = {
-                    "id": next_question.id,
-                    "text": next_question.text,
-                    "options": next_question.options,
-                    "topic": next_question.topic,
-                    "difficulty": next_question.difficulty
-                }
+                if next_question:
+                    session_info["current_question"] = next_question
+                    session_info["questions_asked"] += 1
+                    
+                    result["next_question"] = {
+                        "id": next_question.id,
+                        "text": next_question.text,
+                        "options": next_question.options,
+                        "topic": next_question.topic,
+                        "difficulty": next_question.difficulty
+                    }
+                else:
+                    result["session_complete"] = True
+                    result["message"] = "No more questions available"
+                    _cleanup_learning_session(user_id)
             else:
                 result["session_complete"] = True
-                result["message"] = "No more questions available"
+                result["message"] = "Practice session complete!"
+                _cleanup_learning_session(user_id)
         else:
-            result["session_complete"] = True
-            result["message"] = "Practice session complete!"
-            _cleanup_learning_session(user_id)
+            # Standalone Q&A mode - just validate and provide feedback
+            result["mode"] = "standalone_qa"
+            result["message"] = "Answer validated. Ask for another question or start a practice session for continuous learning."
+            
+            # Clear the current question for standalone mode
+            session_info["current_question"] = None
         
         return json.dumps(result)
         

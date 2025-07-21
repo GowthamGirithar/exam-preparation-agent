@@ -129,7 +129,7 @@ class AutonomousLangGraphAgent:
     When responding, reply only with JSON in this exact format:
             {{
                 "needs_tools": true/false,
-                "reasoning": "explain your decision",
+                "reasoning": "explain your decision why the tools is used, if its false explain why other tools are not used",
                 "tools_to_use": [
                     {{
                         "tool_name": "exact_tool_name",
@@ -139,7 +139,7 @@ class AutonomousLangGraphAgent:
                 ]
             }}
 
-    If no tools are needed, use an empty array for tools_to_use.
+    If no tools are needed, use an empty array for tools_to_use and set needs_tools to false. Reply this also with only JSON format.
     """ 
         
         try:
