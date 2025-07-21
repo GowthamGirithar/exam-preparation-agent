@@ -41,13 +41,13 @@ class SearchInput(BaseModel):
 @tool("english_search_document", 
       args_schema=SearchInput if Config.TOOL_SCHEMA_VALIDATION else None,
       description="Use this tool for any learning related to English grammar, vocabulary, comprehension passages, and language skills for CLAT exam and not for practising questions")
-def english_document_search(query_or_json, max_results: int = 5):
+def english_document_search(query: str, max_results: int = 5):
     """Search English language study materials for CLAT exam preparation."""
     
     # Parse input only for Ollama mode (when validation is off)
     if not Config.TOOL_SCHEMA_VALIDATION:
-        params = parse_tool_input(query_or_json, "english_search_document")
-        query_or_json = params.get("query", str(query_or_json))
+        params = parse_tool_input(query, "english_search_document")
+        query = params.get("query", str(query))
         max_results = params.get("max_results", max_results)
     
     try:
@@ -57,8 +57,8 @@ def english_document_search(query_or_json, max_results: int = 5):
             embedding_model=Config.DEFAULT_EMBEDDING_MODEL,
             collection_name=Config.ENGLISH_COLLECTION
         )
-        results = vector_store.get_chroma_retriever(top_k=max_results).invoke(query_or_json)
-        logger.info(f"English search returned {len(results)} results for query: {query_or_json}")
+        results = vector_store.get_chroma_retriever(top_k=max_results).invoke(query)
+        logger.info(f"English search returned {len(results)} results for query: {query}")
         return results
     except Exception as e:
         logger.error(f"English search error: {e}")
@@ -66,20 +66,20 @@ def english_document_search(query_or_json, max_results: int = 5):
 
 
 @tool("search_web", description="Search the web for current information, facts, news, and general knowledge")
-def search_web(query_or_json: str) -> str:
+def search_web(query: str) -> str:
     """Search the web for current information, facts, news, and general knowledge."""
     
     # Parse input only for Ollama mode (when validation is off)
     if not Config.TOOL_SCHEMA_VALIDATION:
-        params = parse_tool_input(query_or_json, "search_web")
-        query_or_json = params.get("query", str(query_or_json))
+        params = parse_tool_input(query, "search_web")
+        query = params.get("query", str(query))
     
     try:      
         serper = GoogleSerperAPIWrapper(
             serper_api_key=Config.GOOGLE_SERPER_API_KEY,
             k=Config.SEARCH_RESULTS_LIMIT,
         )
-        response = serper.run(query_or_json)
+        response = serper.run(query)
         logger.info(f"Web search completed for query: {query}")
         return response
     except Exception as e:

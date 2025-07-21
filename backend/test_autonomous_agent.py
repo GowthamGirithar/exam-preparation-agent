@@ -27,13 +27,13 @@ def test_complete_learning_flow():
         llm_model=Config.LLM_MODEL,
         llm_host=Config.LLM_HOST,
         tools=[
-            "english_search_document", 
-            "search_web",
-            "start_practice_session",
-            "get_practice_question", 
-            "submit_practice_answer",
-            "get_learning_progress",
-            "get_adaptive_question"
+            "english_search_document",  # testing ok
+            "search_web",             # testing ok
+            "start_practice_session", # testing ok
+            "get_practice_question",  # testing ok
+            "submit_practice_answer", # testing ok
+            "get_learning_progress",  # testing ok
+            "get_adaptive_question"   # testing ok
         ]
     )
     print("Agent created successfully!")
@@ -41,8 +41,55 @@ def test_complete_learning_flow():
     
     user_id = "test_student"
     session_id = "learning_session"
+
     
+    # Step 1: Ask agent to provide a grammar question
+    print("Step 1: Requesting a grammar question session")
     
+    question_request = "Please start a practice session with 2 questions on grammar question to practice for the user with id test_student"
+    print(f"User: {question_request}")
+    
+    try:
+        response1 = autonomous_agent.answer_questions(question_request, user_id, session_id)
+        
+        # Show what the agent decided to do
+        plan1 = response1.get('plan', {})
+        print(f"Agent's Plan: {plan1.get('reasoning', 'No reasoning')}")
+        
+        tool_results1 = response1.get('tool_results', [])
+        if tool_results1:
+            print(f" Tools Used: {[tr['tool_name'] for tr in tool_results1 if tr['success']]}")
+        
+        print()
+        print("Agent's Response:")
+        print(response1['output'])
+        print()
+        
+    except Exception as e:
+        print(f"❌ Error in Step 1: {e}")
+        return
+    
+    for i in range(2):
+        user_answer = "user with id test_student answered that my answer is B"
+        print(f"User: {user_answer}")
+        response2 = autonomous_agent.answer_questions(user_answer, user_id, session_id)
+        
+        # Show what the agent decided to do
+        plan2 = response2.get('plan', {})
+        print(f"Agent's Plan: {plan2.get('reasoning', 'No reasoning')}")
+        
+        tool_results2 = response2.get('tool_results', [])
+        if tool_results2:
+            print(f"Tools Used: {[tr['tool_name'] for tr in tool_results2 if tr['success']]}")
+        
+        print()
+        print("Agent's Response:")
+        print(response2['output'])
+
+
+
+    
+   
     # Step 1: Ask agent to provide a grammar question
     print("Step 1: Requesting a grammar question")
     
@@ -99,7 +146,6 @@ def test_complete_learning_flow():
         print(f"❌ Error in Step 2: {e}")
         return
     
-    '''
     
     # Step 3: Ask for explanation
     print("💡 Step 3: Requesting explanation")
@@ -129,12 +175,14 @@ def test_complete_learning_flow():
     except Exception as e:
         print(f"❌ Error in Step 3: {e}")
         return
+
+    
     
     # Step 4: Check learning progress
     print("📊 Step 4: Checking learning progress")
     print("-" * 40)
     
-    progress_request = "Show me my learning progress"
+    progress_request = "user with id test_student asking for learning progress"
     print(f"👤 User: {progress_request}")
     
     try:
@@ -157,16 +205,57 @@ def test_complete_learning_flow():
         print(f"❌ Error in Step 4: {e}")
         return
     
-    print("🎉 Complete Learning Flow Test Completed!")
-    print()
-    print("📝 What We Tested:")
-    print("   ✅ Agent autonomously provided a practice question")
-    print("   ✅ Agent processed user's answer")
-    print("   ✅ Agent verified and explained the answer")
-    print("   ✅ Agent tracked learning progress")
-    print("   ✅ All decisions were made autonomously by the LLM")
-    print("   ✅ Each step was debuggable with clear reasoning")
-    '''
+    # Step 5: Check current affairs
+    print("Step 5: Check current affairs")
+    
+    progress_request = "user with id test_student asking for what is the main hot topic in India now"
+    print(f"👤 User: {progress_request}")
+    
+    try:
+        response4 = autonomous_agent.answer_questions(progress_request, user_id, session_id)
+        
+        # Show what the agent decided to do
+        plan4 = response4.get('plan', {})
+        print(f"🧠 Agent's Plan: {plan4.get('reasoning', 'No reasoning')}")
+        
+        tool_results4 = response4.get('tool_results', [])
+        if tool_results4:
+            print(f"🔧 Tools Used: {[tr['tool_name'] for tr in tool_results4 if tr['success']]}")
+        
+        print()
+        print("Agent's Response:")
+        print(response4['output'])
+        print()
+        
+    except Exception as e:
+        print(f"❌ Error in Step 4: {e}")
+        return
+     
+    # Step 6: English document
+    print("Step 6: Get english document")
+    
+    progress_request = "user with id test_student asking teach something in english"
+    print(f"👤 User: {progress_request}")
+    
+    try:
+        response4 = autonomous_agent.answer_questions(progress_request, user_id, session_id)
+        
+        # Show what the agent decided to do
+        plan4 = response4.get('plan', {})
+        print(f"🧠 Agent's Plan: {plan4.get('reasoning', 'No reasoning')}")
+        
+        tool_results4 = response4.get('tool_results', [])
+        if tool_results4:
+            print(f"🔧 Tools Used: {[tr['tool_name'] for tr in tool_results4 if tr['success']]}")
+        
+        print()
+        print("Agent's Response:")
+        print(response4['output'])
+        print()
+        
+    except Exception as e:
+        print(f"❌ Error in Step 4: {e}")
+        return
 
 def test_simple_interaction():
     """Test a simple interaction to verify basic functionality."""

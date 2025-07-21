@@ -340,7 +340,7 @@ class AutonomousLangGraphAgent:
             results_summary = []
             for result in tool_results:
                 if result["success"]:
-                    results_summary.append(f"Tool {result['tool_name']}: {result['result'][:300]}...")
+                    results_summary.append(f"Tool {result['tool_name']}: {result['result'][:1000]}...")
                 else:
                     results_summary.append(f"Tool {result['tool_name']} failed: {result['result']}")
             
@@ -357,9 +357,10 @@ class AutonomousLangGraphAgent:
             Please follow these guidelines when responding:
             1. Answer the user's question directly and helpfully.
             2. Use any tool results or planning info provided to ensure accurate and relevant answers.
-            3. If tool results contain JSON data with questions or progress, format that information clearly and nicely.
-            4. Be encouraging and supportive, keeping in mind the user's exam preparation.
-            5. If any tools failed or provided incomplete information, acknowledge this but still do your best to assist.
+            3. If the tool result includes a next question (e.g., under 'next_question'), present it clearly to the user with options listed.
+            4. If the tool result includes progress info, summarize it to show how far along the user is in the session.
+            5. Be encouraging and supportive, keeping in mind the user's exam preparation.
+            6. If any tools failed or provided incomplete information, acknowledge this but still do your best to assist.
 
             Generate responses that are natural, conversational, and informative."""
         else:
