@@ -53,6 +53,9 @@ class Config:
     # Universal API Key for any LLM provider (OpenAI, Anthropic, etc.)
     LLM_PROVIDER_API_KEY = os.getenv("LLM_PROVIDER_API_KEY") or os.getenv("OPENAI_API_KEY")
     
+    # Memory Enhancement - Checkpointer Configuration
+    CHECKPOINTER_DB_PATH = os.getenv("CHECKPOINTER_DB_PATH", "./agent_memory.db")
+    
     @classmethod
     def validate(cls):
         """Validate required configuration"""

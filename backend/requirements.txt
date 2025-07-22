@@ -16,7 +16,7 @@ google-search-results
 fastapi
 langsmith
 langgraph>=0.2.0
-
+langgraph.checkpoint.sqlite
 # Database Dependencies for Learning System
 sqlalchemy>=2.0.0  # ORM for database operations and model definitions
 alembic>=1.13.0    # Database migration tool for schema versioning

@@ -1,6 +1,7 @@
 from typing import TypedDict, Annotated, List, Dict, Any, Optional, Literal
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
+from langgraph.checkpoint.sqlite import SqliteSaver
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, ToolMessage
 from langchain_core.prompts import ChatPromptTemplate
 from llm.llm_factory import get_llm
@@ -8,6 +9,7 @@ from tools.tools_registry import get_registered_tools
 from config import Config
 import json
 import logging
+import sqlite3
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -54,12 +56,19 @@ class AutonomousLangGraphAgent:
         self.tools = get_registered_tools(tools)
         self.tools_by_name = {tool.name: tool for tool in self.tools}
         
-        # Create the workflow graph
-        self.workflow = self._create_workflow()
+        # Setup persistent checkpointer for memory
+        self.checkpointer = self._setup_checkpointer()
         
-        # Session storage for conversation history
-        # later this can be convereted into checkpointer memory
-        self.session_histories = {}
+        # Create the workflow graph with checkpointer
+        self.workflow = self._create_workflow()
+    
+    def _setup_checkpointer(self):
+        """Setup SQLite checkpointer for persistent memory"""
+        # https://langchain-ai.github.io/langgraph/concepts/persistence/#using-in-langgraph
+        db_path = Config.CHECKPOINTER_DB_PATH
+        logger.info(f"Setting up checkpointer with database: {db_path}")
+        conn = sqlite3.connect(db_path, check_same_thread=False)
+        return SqliteSaver(conn)
     
     def _create_workflow(self) -> StateGraph:
         
@@ -87,9 +96,10 @@ class AutonomousLangGraphAgent:
         workflow.add_edge("executor", "responder")
         workflow.add_edge("responder", END)
        
-       # There is workflow.add_sequence where we can add all the nodes executed in sequential order 
+       # There is workflow.add_sequence where we can add all the nodes executed in sequential order
         
-        return workflow.compile()
+        # Compile with checkpointer for persistent memory
+        return workflow.compile(checkpointer=self.checkpointer)
     
     def _planner_node(self, state: AgentState) -> AgentState:
         """
@@ -487,7 +497,7 @@ class AutonomousLangGraphAgent:
     """ answer_questions is the conversation agent interface"""
     def answer_questions(self, question: str, user_id: str, session_id: str = "default") -> Dict[str, Any]:
         """
-        Main interface method that processes questions using the debuggable workflow.
+        Main interface method that processes questions using the debuggable workflow with persistent memory.
         
         Args:
             question: The user's question
@@ -500,12 +510,14 @@ class AutonomousLangGraphAgent:
         logger.info(f"Starting autonomous agent for user {user_id}, session {session_id}")
         logger.info(f"Question: {question}")
         
-        # Get or create session history
-        session_key = f"{user_id}_{session_id}"
-        if session_key not in self.session_histories:
-            self.session_histories[session_key] = []
+        # Create thread configuration for persistent memory
+        thread_config = {
+            "configurable": {
+                "thread_id": f"{user_id}_{session_id}"
+            }
+        }
         
-        # Create initial state
+        # Create initial state (checkpointer will handle history automatically)
         initial_state = AgentState(
             messages=[HumanMessage(content=question)],
             user_id=user_id,
@@ -517,16 +529,10 @@ class AutonomousLangGraphAgent:
             next_action=""
         )
         
-        # Add conversation history to state
-        initial_state["messages"] = self.session_histories[session_key] + initial_state["messages"]
-        
         try:
-            # Execute the debuggable workflow
-            logger.info("Executing workflow...")
-            final_state = self.workflow.invoke(initial_state)
-            
-            # Update session history
-            self.session_histories[session_key] = final_state["messages"]
+            # Execute workflow - checkpointer automatically loads/saves conversation history
+            logger.info("Executing workflow with persistent memory...")
+            final_state = self.workflow.invoke(initial_state, config=thread_config)
             
             # Extract the final response
             ai_messages = [msg for msg in final_state["messages"] if isinstance(msg, AIMessage)]
@@ -546,7 +552,7 @@ class AutonomousLangGraphAgent:
                             })
                             break
             
-            logger.info("Workflow completed successfully")
+            logger.info("Workflow completed successfully with persistent memory")
             
             return {
                 "output": output,
@@ -556,7 +562,9 @@ class AutonomousLangGraphAgent:
                 "debug_info": {
                     "planner_reasoning": final_state.get("plan", {}).get("reasoning"),
                     "tools_executed": len(final_state.get("tool_results", [])),
-                    "workflow_steps": ["planner", "executor" if final_state.get("tool_results") else "responder"]
+                    "workflow_steps": ["planner", "executor" if final_state.get("tool_results") else "responder"],
+                    "memory_persistent": True,  # NEW: Indicate persistent memory
+                    "thread_id": thread_config["configurable"]["thread_id"]  # NEW: For debugging
                 }
             }
             
@@ -567,7 +575,7 @@ class AutonomousLangGraphAgent:
                 "chat_history": [],
                 "plan": None,
                 "tool_results": [],
-                "debug_info": {"error": str(e)}
+                "debug_info": {"error": str(e), "memory_persistent": False}
             }
     
     def get_tool_info(self):
