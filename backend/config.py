@@ -24,7 +24,7 @@ class Config:
     LAW_COLLECTION = os.getenv("LAW_COLLECTION", "law")
     
     # Agent Configuration
-    AGENT_NAME = os.getenv("AGENT_NAME", "InteractiveLearningAgent")
+    AGENT_NAME = os.getenv("AGENT_NAME", "AutonomousLangGraphAgent")
     MAX_ITERATIONS = int(os.getenv("MAX_ITERATIONS", "5"))
     VERBOSE_MODE = os.getenv("VERBOSE_MODE", "true").lower() == "true"
     SEARCH_RESULTS_LIMIT = int(os.getenv("SEARCH_RESULTS_LIMIT", "3"))
