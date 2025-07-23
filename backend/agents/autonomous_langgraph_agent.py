@@ -516,10 +516,12 @@ class AutonomousLangGraphAgent:
                 "thread_id": f"{user_id}_{session_id}"
             }
         }
+
+        user_question = "user with id"+user_id+" and asked "+question
         
         # Create initial state (checkpointer will handle history automatically)
         initial_state = AgentState(
-            messages=[HumanMessage(content=question)],
+            messages=[HumanMessage(content=user_question)],
             user_id=user_id,
             session_id=session_id,
             plan=None,

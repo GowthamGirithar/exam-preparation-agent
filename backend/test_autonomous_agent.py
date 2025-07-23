@@ -230,9 +230,37 @@ def test_complete_learning_flow():
     except Exception as e:
         print(f"❌ Error in Step 4: {e}")
         return
-     
-    # Step 6: English document
-    print("Step 6: Get english document")
+    '''
+    print("Step 6: Check memory")
+    
+    progress_request = "user with id test_student asking for what did I ask before?"
+    print(f"👤 User: {progress_request}")
+    
+    try:
+        response5 = autonomous_agent.answer_questions(progress_request, user_id, session_id)
+        
+        # Show what the agent decided to do
+        plan4 = response5.get('plan', {})
+        print(f"🧠 Agent's Plan: {plan4.get('reasoning', 'No reasoning')}")
+        
+        tool_results5 = response5.get('tool_results', [])
+        if tool_results5:
+            print(f"🔧 Tools Used: {[tr['tool_name'] for tr in tool_results5 if tr['success']]}")
+        
+        print()
+        print("Agent's Response:")
+        print(response5['output'])
+        print()
+        
+    except Exception as e:
+        print(f"❌ Error in Step 4: {e}")
+        return
+    
+    
+
+    
+    # Step 7: English document
+    print("Step 7: Get english document")
     
     progress_request = "user with id test_student asking teach something in english"
     print(f"👤 User: {progress_request}")
@@ -256,7 +284,8 @@ def test_complete_learning_flow():
     except Exception as e:
         print(f"❌ Error in Step 4: {e}")
         return
-
+    
+    '''
 def test_simple_interaction():
     """Test a simple interaction to verify basic functionality."""
     print("\n🔍 Testing Simple Interaction")

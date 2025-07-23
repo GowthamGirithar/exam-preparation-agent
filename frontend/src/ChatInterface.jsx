@@ -46,15 +46,15 @@ const ChatInterface = () => {
     <div className="flex flex-col h-screen max-h-screen bg-gray-100">
       {/* Header */}
       <div className="bg-blue-600 text-white p-3 shadow-md flex-shrink-0">
-        <h1 className="text-xl font-semibold">Law Exam Agent</h1>
-        <p className="text-blue-100 text-sm">Ask me any law-related questions</p>
+        <h1 className="text-xl font-semibold">Personal Law Exam Coaching Assistant</h1>
+        <p className="text-blue-100 text-sm">Ask me any Law exam related question to practise and also current affairs </p>
       </div>
 
       {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+      <div className="overflow-y-auto p-4 space-y-4 grow">
         {messages.length === 0 && (
           <div className="text-center text-gray-500 mt-8">
-            <p>Welcome! Ask me any law-related question to get started.</p>
+            <p>Welcome!</p>
           </div>
         )}
         
@@ -93,7 +93,7 @@ const ChatInterface = () => {
       </div>
 
       {/* Input Form - Fixed at bottom */}
-      <div className="bg-white border-t border-gray-200 p-4 flex-shrink-0">
+      <div className="bg-white border-t border-gray-200 p-4 sticky bottom-0 z-10">
         {/* Error Message */}
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 mb-3 rounded">
