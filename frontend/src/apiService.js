@@ -1,5 +1,6 @@
 import axios from 'axios';
 
+// backend API 
 const API_BASE_URL = 'http://localhost:8000';
 
 const apiClient = axios.create({
@@ -9,13 +10,14 @@ const apiClient = axios.create({
   },
 });
 
+// make the call the API
 export const chatService = {
   sendMessage: async (question) => {
     try {
       const response = await apiClient.post('/chat', {
-        user_id: 'user1',
+        user_id: 'user1', // hardcoded now
         question: question,
-        session_id: 'default'
+        session_id: 'default' // hardcoded now
       });
       return response.data;
     } catch (error) {

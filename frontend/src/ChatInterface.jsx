@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { chatService } from './apiService';
 
+// included in app.jsx
 const ChatInterface = () => {
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!inputValue.trim()) return;
@@ -47,16 +49,11 @@ const ChatInterface = () => {
       {/* Header */}
       <div className="bg-blue-600 text-white p-3 shadow-md flex-shrink-0">
         <h1 className="text-xl font-semibold">Personal Law Exam Coaching Assistant</h1>
-        <p className="text-blue-100 text-sm">Ask me any Law exam related question to practise and also current affairs </p>
+        <p className="text-blue-100 text-sm">You can practise questions related to grammer and other topics and also track perfromance metrics. </p>
       </div>
 
       {/* Messages Container */}
       <div className="overflow-y-auto p-4 space-y-4 grow">
-        {messages.length === 0 && (
-          <div className="text-center text-gray-500 mt-8">
-            <p>Welcome!</p>
-          </div>
-        )}
         
         {messages.map((message) => (
           <div
@@ -101,7 +98,7 @@ const ChatInterface = () => {
           </div>
         )}
         
-        <form onSubmit={handleSubmit} className="flex space-x-2">
+        <form onSubmit={handleSubmit} className="flex space-x-10">
           <input
             type="text"
             value={inputValue}
@@ -116,7 +113,7 @@ const ChatInterface = () => {
             disabled={isLoading || !inputValue.trim()}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
-            {isLoading ? 'Sending...' : 'Send'}
+            {isLoading ? 'Sending...' : 'SEND'}
           </button>
         </form>
       </div>
