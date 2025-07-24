@@ -123,7 +123,9 @@ Open your browser and navigate to:
 
 ## 🎯 Usage Examples
 
-
+![Question & Ans ](images/example_question_ans.png)
+![Learning Progress ](images/example_learning_progress.png)
+![Current affairs ](images/example_current_affairs.png)
 
 ## 🛠️ Technical Stack
 
