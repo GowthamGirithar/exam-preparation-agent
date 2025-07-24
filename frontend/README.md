@@ -157,14 +157,6 @@ The application uses Tailwind CSS for styling with a modern, clean design:
    - Clear node_modules and reinstall: `rm -rf node_modules && npm install`
    - Check Node.js version compatibility
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
 ## License
 
 This project is part of the Law Exam Agent system.
