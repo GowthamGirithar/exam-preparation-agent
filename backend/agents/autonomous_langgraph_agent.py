@@ -7,6 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from llm.llm_factory import get_llm
 from tools.tools_registry import get_registered_tools
 from config import Config
+from langsmith import traceable
 import json
 import logging
 import sqlite3
@@ -206,6 +207,7 @@ class AutonomousLangGraphAgent:
         
         return state
     
+    @traceable
     def _fallback_plan(self, user_question: str) -> Dict[str, Any]:
         """Fallback planning when LLM fails."""
         logger.info("PLANNER: Using fallback planning logic")
@@ -314,6 +316,7 @@ class AutonomousLangGraphAgent:
         
         return state
     
+    @traceable
     def _execute_single_tool(self, tool_name: str, parameters: Dict[str, Any]) -> str:
         """Execute a single tool with proper error handling."""
         tool = self.tools_by_name.get(tool_name)
@@ -354,7 +357,7 @@ class AutonomousLangGraphAgent:
                 else:
                     results_summary.append(f"Tool {result['tool_name']} failed: {result['result']}")
             
-            # chr(10) - (\n) joun results_summary 
+            # chr(10) - (\n) join results_summary
             system_context = f"""
             You are a helpful assistant specialized in CLAT exam preparation.
 
@@ -365,14 +368,22 @@ class AutonomousLangGraphAgent:
             {chr(10).join(results_summary)}
 
             Please follow these guidelines when responding:
-            1. Answer the user's question directly and helpfully.
-            2. Use any tool results or planning info provided to ensure accurate and relevant answers.
-            3. If the tool result includes a next question (e.g., under 'next_question'), present it clearly to the user with options listed.
-            4. If the tool result includes progress info, summarize it to show how far along the user is in the session.
+            1. Answer the user's question directly and helpfully using markdown formatting.
+            2. Use the tool results provided to ensure accurate and relevant answers.
+            3. **For practice questions**: Use this markdown format:
+               - **Topic:** [topic] **Difficulty:** [level]
+               - [Question text]
+               - **Options:**
+                 [Option A text]
+                 [Option B text]
+                 [Option C text]
+                 [Option D text]
+               - Please choose your answer.
+            4. **For progress data**: Use emojis and bullet points to make it visually appealing
             5. Be encouraging and supportive, keeping in mind the user's exam preparation.
-            6. If any tools failed or provided incomplete information, acknowledge this but still do your best to assist.
+            6. If any tools failed, acknowledge this but still provide helpful guidance.
 
-            Generate responses that are natural, conversational, and informative."""
+            Keep responses concise and well-formatted."""
         else:
             # No tool results, direct response
             system_context = f"""You are a helpful assistant guiding students preparing for the CLAT exam.
@@ -399,9 +410,6 @@ class AutonomousLangGraphAgent:
             response = self.llm.invoke(messages)
             final_response = response.content
             
-            # Enhance response with structured data if available
-            final_response = self._enhance_response_with_structured_data(final_response, tool_results)
-            
             logger.info(f"RESPONDER: Generated response: {final_response[:100]}...")
             
         except Exception as e:
@@ -414,61 +422,6 @@ class AutonomousLangGraphAgent:
         
         return state
     
-    def _enhance_response_with_structured_data(self, response: str, tool_results: List[Dict[str, Any]]) -> str:
-        """Enhance response by parsing and formatting structured data from tools."""
-        '''
-        if no tool results then return llm response
-
-        This function acts like a post-processor, ensuring:
-            Practice questions get formatted cleanly
-            Progress data is rendered with emojis & bullet points
-            LLM output is enhanced, clarified, and made structured
-        '''
-        for result in tool_results:
-            if not result["success"]:
-                continue
-                
-            try:
-                result_content = result["result"]
-                # Look for JSON in tool results
-                if '{"success":' in result_content or '{"question":' in result_content:
-                    # Extract JSON part
-                    json_start = result_content.find('{')
-                    json_end = result_content.rfind('}') + 1
-                    if json_start >= 0 and json_end > json_start:
-                        json_str = result_content[json_start:json_end]
-                        parsed = json.loads(json_str)
-                        
-                        # Format based on content type
-                        if "question" in parsed and parsed.get("success"):
-                            question_data = parsed["question"]
-                            formatted_question = f"""
-
-                                        📚 **Practice Question:**
-                                        **Topic:** {question_data.get('topic', 'General')}
-                                        **Difficulty:** {question_data.get('difficulty', 'Medium')}
-
-                                        {question_data.get('text', '')}
-
-                                        **Options:**
-                                        {question_data.get('options', '')}
-
-                                        Please provide your answer (A, B, C, or D).
-                                        """
-                            response = response + formatted_question
-                        
-                        elif "analytics" in parsed and parsed.get("success"):
-                            analytics = parsed["analytics"]
-                            if analytics and "topics" in analytics:
-                                progress_text = "\n\n📊 **Your Learning Progress:**\n"
-                                for topic in analytics["topics"][:5]:
-                                    status_emoji = "🟢" if topic["status"] == "excellent" else "🟡" if topic["status"] == "good" else "🔴"
-                                    progress_text += f"{status_emoji} **{topic['topic']}**: {topic['accuracy']:.1f}% ({topic['total_questions']} questions)\n"
-                                response = response + progress_text
-            except (json.JSONDecodeError, KeyError):
-                continue
-        
-        return response
     
 
     # _get_tool_descriptions returns tool description and parameters for the llm to decide which tools and parameter to pass for tools
@@ -495,6 +448,7 @@ class AutonomousLangGraphAgent:
         return "\n".join(descriptions)
     
     """ answer_questions is the conversation agent interface"""
+    @traceable
     def answer_questions(self, question: str, user_id: str, session_id: str = "default") -> Dict[str, Any]:
         """
         Main interface method that processes questions using the debuggable workflow with persistent memory.
@@ -556,28 +510,31 @@ class AutonomousLangGraphAgent:
             
             logger.info("Workflow completed successfully with persistent memory")
             
-            return {
+            # Return clean response structure without redundant data
+            response_data = {
                 "output": output,
-                "chat_history": chat_history,
-                "plan": final_state.get("plan"),
-                "tool_results": final_state.get("tool_results", []),
-                "debug_info": {
+                "chat_history": chat_history
+            }
+            
+            # Only include debug info in development/debug mode
+            # You can control this with an environment variable
+            import os
+            if os.getenv("DEBUG_MODE", "false").lower() == "true":
+                response_data["debug_info"] = {
                     "planner_reasoning": final_state.get("plan", {}).get("reasoning"),
                     "tools_executed": len(final_state.get("tool_results", [])),
                     "workflow_steps": ["planner", "executor" if final_state.get("tool_results") else "responder"],
-                    "memory_persistent": True,  # NEW: Indicate persistent memory
-                    "thread_id": thread_config["configurable"]["thread_id"]  # NEW: For debugging
+                    "memory_persistent": True,
+                    "thread_id": thread_config["configurable"]["thread_id"]
                 }
-            }
+            
+            return response_data
             
         except Exception as e:
             logger.error(f"❌ Error in autonomous workflow: {e}")
             return {
                 "output": f"I apologize, but I encountered an error: {str(e)}",
-                "chat_history": [],
-                "plan": None,
-                "tool_results": [],
-                "debug_info": {"error": str(e), "memory_persistent": False}
+                "chat_history": []
             }
     
     def get_tool_info(self):

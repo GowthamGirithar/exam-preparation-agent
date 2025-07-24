@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { chatService } from './apiService';
 
 // included in app.jsx
@@ -67,7 +68,13 @@ const ChatInterface = () => {
                   : 'bg-white text-gray-800 shadow-md'
               }`}
             >
-              <p className="text-sm">{message.text}</p>
+              {message.sender === 'bot' ? (
+                <ReactMarkdown className="text-sm prose prose-sm max-w-none">
+                  {message.text}
+                </ReactMarkdown>
+              ) : (
+                <p className="text-sm">{message.text}</p>
+              )}
               <p className={`text-xs mt-1 ${
                 message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
               }`}>
