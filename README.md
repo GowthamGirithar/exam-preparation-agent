@@ -1,4 +1,4 @@
-# Law Exam Agent 🎓⚖️
+# Personal Coaching Autonomous Law Exam Agent 🎓⚖️
 
 A comprehensive AI-powered coaching assistant for CLAT (Common Law Admission Test) preparation, built with LangGraph autonomous agents and modern web technologies.
 
@@ -148,26 +148,24 @@ Open your browser and navigate to:
 - **Ollama**: Local LLM hosting
 - **OpenAI GPT**: Cloud LLM option
 - **HuggingFace Transformers**: Embedding models
-- **LangSmith**: Agent evaluation and monitoring
+
 
 ## 🔧 Configuration Options
 
 ### LLM Providers
 - **Ollama** (local): Free, private, customizable
 - **OpenAI**: High-quality, cloud-based
-- **Anthropic**: Claude models (future support)
 
 ### Vector Stores
 - **ChromaDB**: Default, lightweight
-- **Pinecone**: Cloud-based (configurable)
 
 ### Agent Types
 - **AutonomousLangGraphAgent**: Advanced reasoning with tools
-- **InteractiveLearningAgent**: Focused on educational interactions
+- Other agents which you see under agents are for learning purpose and about learning experience you can go through the learning_experience document.
 
 ## 📊 Evaluation & Monitoring
 
-The system includes comprehensive evaluation capabilities:
+The system includes comprehensive evaluation capabilities: Evaluation is not there for AutonomousLangGraphAgent. It also uses Langsmith.
 
 ```bash
 # Run agent evaluation
@@ -184,6 +182,11 @@ python -m evaluation.utils.results_analyzer
 - **Relevance**: Response relevance to questions
 - **Memory Retention**: Session continuity
 
+## Observability 
+
+**LangSmith** based observability
+
+![alt text](images/observability.png)
 
 ## 🔍 API Endpoints
 
