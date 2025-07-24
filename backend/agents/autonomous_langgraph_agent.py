@@ -380,8 +380,9 @@ class AutonomousLangGraphAgent:
                  [Option D text]
                - Please choose your answer.
             4. **For progress data**: Use emojis and bullet points to make it visually appealing
-            5. Be encouraging and supportive, keeping in mind the user's exam preparation.
-            6. If any tools failed, acknowledge this but still provide helpful guidance.
+            5. ** For submit answer**: If there is a next question in the tools output of submit answe, ask the question to the user in the same format as practise question
+            6. Be encouraging and supportive, keeping in mind the user's exam preparation.
+            7. If any tools failed, acknowledge this but still provide helpful guidance.
 
             Keep responses concise and well-formatted."""
         else:
