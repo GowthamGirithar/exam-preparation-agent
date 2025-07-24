@@ -14,11 +14,8 @@ class LawExamAgent:
     LawExamAgent does the following things.
     
     Classify the question to decide whether to use RAG or pass to LLM without context.
-    
-    What is missing here is the inteligent, i.e., we have code to decide whether to use RAG 
-    or directly invoke LLM
 
-    Advantage is that we have more control to decide the source of data.
+    And call the LLM again with the vector db results to get the answer.
     
     '''
     def __init__(self, llm_provider: str, llm_model: str, llm_host: str):
