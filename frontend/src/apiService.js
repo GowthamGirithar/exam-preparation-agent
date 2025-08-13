@@ -24,5 +24,21 @@ export const chatService = {
       console.error('Error sending message:', error);
       throw error;
     }
-  }
+  },
+
+  submitApproval: async (decision, feedbackMessage = '') => {
+    try {
+      const response = await apiClient.post('/human-approval', {
+        user_id: 'user1', // hardcoded now
+        session_id: 'default', // hardcoded now
+        decision: decision,
+        feedback_message: feedbackMessage
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error submitting approval:', error);
+      throw error;
+    }
+  },
+
 };

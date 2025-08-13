@@ -56,6 +56,11 @@ class Config:
     # Memory Enhancement - Checkpointer Configuration
     CHECKPOINTER_DB_PATH = os.getenv("CHECKPOINTER_DB_PATH", "./agent_memory.db")
     
+    # Human Feedback Configuration
+    HUMAN_FEEDBACK_ENABLED = os.getenv("HUMAN_FEEDBACK_ENABLED", "false").lower() == "true"
+    HUMAN_FEEDBACK_CONFIDENCE_THRESHOLD = float(os.getenv("HUMAN_FEEDBACK_CONFIDENCE_THRESHOLD", "0.7"))
+    HUMAN_FEEDBACK_AUTO_APPROVE_THRESHOLD = float(os.getenv("HUMAN_FEEDBACK_AUTO_APPROVE_THRESHOLD", "0.9"))
+    
     @classmethod
     def validate(cls):
         """Validate required configuration"""
