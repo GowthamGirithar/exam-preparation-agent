@@ -7,6 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from llm.llm_factory import get_llm
 from tools.tools_registry import get_registered_tools
 from config import Config
+from human_feedback_helper import HumanFeedbackHelper
 from langsmith import traceable
 import json
 import logging
@@ -35,6 +36,14 @@ class AgentState(TypedDict):
     iteration_count: int
     max_iterations: int
     next_action: str  # What to do next
+    
+    # Simple human feedback fields
+    needs_human_approval: bool
+    human_feedback_enabled: bool
+    pending_human_review: Optional[str]  # Simple message for human
+    confidence_score: float
+    human_decision: Optional[str]  # "approve", "reject", "modify"
+    human_feedback_message: Optional[str]  # Optional message from human
 
 
 class AutonomousLangGraphAgent:
@@ -73,7 +82,7 @@ class AutonomousLangGraphAgent:
     
     def _create_workflow(self) -> StateGraph:
         
-        """Create the debuggable workflow with clear steps."""
+        """Create the debuggable workflow with conditional human feedback capability."""
         workflow = StateGraph(AgentState)
         
         # Add nodes with clear responsibilities
@@ -81,16 +90,31 @@ class AutonomousLangGraphAgent:
         workflow.add_node("executor", self._executor_node)
         workflow.add_node("responder", self._responder_node)
         
+        # NEW: Add human approval node (only used when needed)
+        workflow.add_node("human_approval", self._human_approval_node)
+        
         # Set entry point
         workflow.set_entry_point("planner")
         
-        # Add clear routing
+        # NEW: Enhanced routing with conditional human approval
         workflow.add_conditional_edges(
             "planner",
             self._route_after_planning,
             {
+                "needs_approval": "human_approval",  # Only when confidence < 0.7 AND enabled
+                "execute_tools": "executor",         # Normal flow for high confidence
+                "respond_directly": "responder"      # Normal flow for no-tool responses
+            }
+        )
+        
+        # NEW: Route from human approval (only reached when approval was needed)
+        workflow.add_conditional_edges(
+            "human_approval",
+            self._route_after_human_approval,
+            {
                 "execute_tools": "executor",
-                "respond_directly": "responder"
+                "respond_directly": "responder",
+                "replan": "planner"
             }
         )
         
@@ -99,19 +123,33 @@ class AutonomousLangGraphAgent:
        
        # There is workflow.add_sequence where we can add all the nodes executed in sequential order
         
-        # Compile with checkpointer for persistent memory
-        return workflow.compile(checkpointer=self.checkpointer)
+        # NEW: Compile with checkpointer and CONDITIONAL interrupt
+        # interrupt_before=["human_approval"] means:
+        # - Only interrupts when workflow actually goes to human_approval node
+        # - Most questions will bypass this node entirely
+        return workflow.compile(
+            checkpointer=self.checkpointer,
+            interrupt_before=["human_approval"]  # Only interrupts when approval is actually needed
+        )
     
     def _planner_node(self, state: AgentState) -> AgentState:
         """
         PLANNER: Analyzes the question and decides what tools to use.
-        This is completely under our control and easy to debug.
+        Now includes simple confidence assessment for human feedback.
         """
         logger.info("PLANNER: Starting planning phase")
         
+        # Check if this is a replanning request from human feedback
+        human_decision = state.get("human_decision", None)
+        human_feedback_message = state.get("human_feedback_message", "")
+        is_replanning = human_decision == "modify"
+        
+        if is_replanning:
+            logger.info(f"PLANNER: Replanning based on human feedback: {human_feedback_message}")
+        
         # Get the user's question
         # we have different message type like human, system (prompt), ai(response from llm), etc.
-        # messages contain all the messages 
+        # messages contain all the messages
         last_human_message = None
         for msg in reversed(state["messages"]):
             if isinstance(msg, HumanMessage):
@@ -122,6 +160,8 @@ class AutonomousLangGraphAgent:
             logger.error("PLANNER: No human message found")
             state["plan"] = {"action": "respond_directly", "reason": "No user question found"}
             state["next_action"] = "respond_directly"
+            state["needs_human_approval"] = False
+            state["confidence_score"] = 1.0
             return state
         
         user_question = last_human_message.content
@@ -129,13 +169,33 @@ class AutonomousLangGraphAgent:
         
         # Create planning prompt or we can say routing as well which decide which tool to use
         # mentioning structure of response about tool helps for next steps
+        
+        # Add replanning context if this is a modification request
+        replanning_context = ""
+        if is_replanning:
+            previous_plan = state.get("plan", {})
+            replanning_context = f"""
+    
+    IMPORTANT: This is a REPLANNING request. The human has requested changes to the previous plan.
+    
+    Previous Plan (that was rejected):
+    - Reasoning: {previous_plan.get('reasoning', 'No previous reasoning')}
+    - Tools: {[tool.get('tool_name') for tool in previous_plan.get('tools_to_use', [])]}
+    
+    Human Feedback: "{human_feedback_message if human_feedback_message else 'No specific feedback provided'}"
+    
+    Please create a NEW plan that addresses the human's feedback and concerns.
+    Consider alternative approaches or different tools that might better meet their needs.
+    """
+        
         system_message = f"""You are an assistant with access to the following tools:
 
     Available Tools:
     {self._get_tool_descriptions()}
 
-    Your task: Analyze the user's question and decide if you need to use any tools.  
+    Your task: Analyze the user's question and decide if you need to use any tools.
     Be specific about WHY.
+    {replanning_context}
 
     When responding, reply only with JSON in this exact format:
             {{
@@ -151,7 +211,7 @@ class AutonomousLangGraphAgent:
             }}
 
     If no tools are needed, use an empty array for tools_to_use and set needs_tools to false. Reply this also with only JSON format.
-    """ 
+    """
         
         try:
             # Get planning decision from LLM
@@ -192,6 +252,34 @@ class AutonomousLangGraphAgent:
             # Store the plan
             state["plan"] = plan
             
+            # NEW: Use helper class for confidence assessment
+            confidence_score = HumanFeedbackHelper.assess_confidence(plan, user_question)
+            state["confidence_score"] = confidence_score
+            
+            # NEW: Check if human approval needed using helper
+            needs_approval = HumanFeedbackHelper.should_require_approval(
+                confidence_score, state.get("human_feedback_enabled", False)
+            )
+
+            print(f'Requires approvale is {needs_approval} with confidence {confidence_score}')
+            
+            # For replanning, we don't need approval again - the human already provided feedback
+            if is_replanning:
+                state["needs_human_approval"] = False
+                state["pending_human_review"] = None
+                state["human_decision"] = None  # Clear the decision for next time
+                state["human_feedback_message"] = None  # Clear the feedback
+                logger.info("PLANNER: Replanning completed, proceeding without additional approval")
+            elif needs_approval:
+                state["needs_human_approval"] = True
+                state["pending_human_review"] = HumanFeedbackHelper.create_approval_message(
+                    confidence_score, user_question
+                )
+                logger.info(f"PLANNER: Requesting human approval (confidence: {confidence_score:.2f})")
+            else:
+                state["needs_human_approval"] = False
+                state["pending_human_review"] = None
+            
             # Decide next action
             if plan.get("needs_tools", False) and plan.get("tools_to_use"):
                 state["next_action"] = "execute_tools"
@@ -204,7 +292,10 @@ class AutonomousLangGraphAgent:
             logger.error(f"PLANNER: Error during planning: {e}")
             state["plan"] = self._fallback_plan(user_question)
             state["next_action"] = "execute_tools"
+            state["needs_human_approval"] = False
+            state["confidence_score"] = 0.5  # Medium confidence for fallback
         
+        print(f'we are done with planner node')
         return state
     
     @traceable
@@ -252,10 +343,71 @@ class AutonomousLangGraphAgent:
                 "tools_to_use": []
             }
     
-    def _route_after_planning(self, state: AgentState) -> Literal["execute_tools", "respond_directly"]:
-        """Route based on planner's decision."""
-        # based on the planner output we decide which is the next step and it should be one of the two
-        return state["next_action"]
+    
+    def _human_approval_node(self, state: AgentState) -> AgentState:
+        """
+        Human approval checkpoint - processes human decision after interrupt
+        This node is only reached AFTER interrupt when user provides input
+        """
+        logger.info("HUMAN APPROVAL: Processing human decision after interrupt")
+        
+        # When we reach this node, human_decision should always be present
+        # because interrupt_before=["human_approval"] means we only enter after user input
+        human_decision = state.get("human_decision", None)
+        
+        if not human_decision:
+            logger.error("HUMAN APPROVAL: No human decision found - this should not happen!")
+            # Fallback: treat as approval
+            human_decision = "approve"
+        
+        logger.info(f"HUMAN APPROVAL: Processing decision: {human_decision}")
+        return {
+            **state,
+            "pending_human_review": f"Decision: {human_decision}",
+            "needs_human_approval": False  # Clear the flag since decision is made
+        }
+    
+    def _get_last_human_message_content(self, state: AgentState) -> str:
+        """Helper to get the last human message content."""
+        for msg in reversed(state["messages"]):
+            if isinstance(msg, HumanMessage):
+                return msg.content
+        return ""
+    
+    def _route_after_planning(self, state: AgentState) -> Literal["needs_approval", "execute_tools", "respond_directly"]:
+        """Enhanced routing that checks for human approval needs"""
+        
+        # NEW: Check if human approval is needed FIRST
+        if state.get("needs_human_approval", False):
+            logger.info("ROUTER: Routing to human approval node")
+            return "needs_approval"
+        
+        # Existing logic for normal flow
+        next_action = state.get("next_action", "respond_directly")
+        logger.info(f"ROUTER: Routing to {next_action}")
+        return next_action
+    
+    def _route_after_human_approval(self, state: AgentState) -> Literal["execute_tools", "respond_directly", "replan"]:
+        """Route after human approval - handles human decision"""
+        
+        # Check if human has provided feedback
+        human_decision = state.get("human_decision", None)
+        
+        if human_decision == "reject":
+            logger.info("Human rejected - ending workflow")
+            return "respond_directly"  # Will generate rejection message
+        elif human_decision == "modify":
+            logger.info("Human requested modifications - replanning")
+            return "replan"
+        else:
+            # Default: approve or no decision yet - proceed with original plan
+            plan = state.get("plan", {})
+            if plan.get("needs_tools", False) and plan.get("tools_to_use"):
+                logger.info("Human approved - executing tools")
+                return "execute_tools"
+            else:
+                logger.info("Human approved - responding directly")
+                return "respond_directly"
     
     def _executor_node(self, state: AgentState) -> AgentState:
         """
@@ -343,12 +495,38 @@ class AutonomousLangGraphAgent:
         
         plan = state.get("plan", {})
         tool_results = state.get("tool_results", [])
+        human_decision = state.get("human_decision", None)
+        human_feedback_message = state.get("human_feedback_message", "")
         
         logger.info(f"RESPONDER: Plan reasoning: {plan.get('reasoning', 'No reasoning')}")
         logger.info(f"RESPONDER: Tool results count: {len(tool_results)}")
+        logger.info(f"RESPONDER: Human decision: {human_decision}")
         
+        # Check if human rejected the action
+        if human_decision == "reject":
+            logger.info("RESPONDER: Generating rejection response")
+            system_context = f"""You are a helpful assistant specialized in CLAT exam preparation.
+
+            IMPORTANT: The human has REJECTED the proposed action/tool usage.
+            
+            Original Plan (REJECTED):
+            {plan.get('reasoning', 'No reasoning provided')}
+            
+            Human Feedback: {human_feedback_message if human_feedback_message else 'No specific feedback provided'}
+            
+            Your task: Respond to the user's original question WITHOUT using the rejected tools.
+            
+            Guidelines:
+            1. Acknowledge that you understand their preference
+            2. Provide a helpful response using your general knowledge instead
+            3. Be supportive and offer alternative ways to help
+            4. Don't mention the specific tools that were rejected
+            5. Focus on being helpful within the constraints they've set
+            
+            Keep the response natural, helpful, and focused on their original question."""
+            
         # Create response prompt
-        if tool_results:
+        elif tool_results:
             # We have tool results to incorporate
             results_summary = []
             for result in tool_results:
@@ -450,7 +628,8 @@ class AutonomousLangGraphAgent:
     
     """ answer_questions is the conversation agent interface"""
     @traceable
-    def answer_questions(self, question: str, user_id: str, session_id: str = "default") -> Dict[str, Any]:
+    def answer_questions(self, question: str, user_id: str, session_id: str = "default",
+                        human_feedback_enabled: Optional[bool] = None) -> Dict[str, Any]:
         """
         Main interface method that processes questions using the debuggable workflow with persistent memory.
         
@@ -458,12 +637,18 @@ class AutonomousLangGraphAgent:
             question: The user's question
             user_id: User ID for session management
             session_id: Session ID for conversation history
+            human_feedback_enabled: Enable human feedback loop (None = use config default)
             
         Returns:
             Response dictionary with output and chat history
         """
+        # Use config default if not specified
+        if human_feedback_enabled is None:
+            human_feedback_enabled = Config.HUMAN_FEEDBACK_ENABLED
+            
         logger.info(f"Starting autonomous agent for user {user_id}, session {session_id}")
         logger.info(f"Question: {question}")
+        logger.info(f"Human feedback enabled: {human_feedback_enabled}")
         
         # Create thread configuration for persistent memory
         thread_config = {
@@ -483,21 +668,49 @@ class AutonomousLangGraphAgent:
             tool_results=[],
             iteration_count=0,
             max_iterations=Config.MAX_ITERATIONS,
-            next_action=""
+            next_action="",
+            # NEW: Initialize human feedback fields
+            needs_human_approval=False,
+            human_feedback_enabled=human_feedback_enabled,
+            pending_human_review=None,
+            confidence_score=0.0,
+            human_decision=None,
+            human_feedback_message=None
         )
         
         try:
             # Execute workflow - checkpointer automatically loads/saves conversation history
             logger.info("Executing workflow with persistent memory...")
-            final_state = self.workflow.invoke(initial_state, config=thread_config)
             
-            # Extract the final response
-            ai_messages = [msg for msg in final_state["messages"] if isinstance(msg, AIMessage)]
+            # Use stream to handle interrupts properly
+            events = []
+            for event in self.workflow.stream(initial_state, config=thread_config):
+                events.append(event)
+                logger.info(f"Workflow event: {list(event.keys())}")
+            
+            # Get final state after streaming
+            final_state = self.workflow.get_state(thread_config)
+            
+            # Check if workflow was interrupted (has next nodes to execute)
+            if final_state.next:
+                logger.info(f"Workflow interrupted at: {final_state.next}")
+                # Return interrupt response - let the frontend handle the approval UI
+                return {
+                    "output": None,
+                    "chat_history": [],
+                    "interrupted": True,
+                    "needs_approval": True,
+                    "pending_review": final_state.values.get("pending_human_review"),
+                    "confidence_score": final_state.values.get("confidence_score", 0.0)
+                }
+            
+            # Extract the final response if workflow completed
+            ai_messages = [msg for msg in final_state.values["messages"] if isinstance(msg, AIMessage)]
             output = ai_messages[-1].content if ai_messages else "I apologize, but I couldn't generate a response."
             
             # Format chat history for compatibility
             chat_history = []
-            messages = final_state["messages"]
+            messages = final_state.values["messages"]
             for i in range(0, len(messages)):
                 if isinstance(messages[i], HumanMessage):
                     # Find the next AI message
@@ -522,11 +735,16 @@ class AutonomousLangGraphAgent:
             import os
             if os.getenv("DEBUG_MODE", "false").lower() == "true":
                 response_data["debug_info"] = {
-                    "planner_reasoning": final_state.get("plan", {}).get("reasoning"),
-                    "tools_executed": len(final_state.get("tool_results", [])),
-                    "workflow_steps": ["planner", "executor" if final_state.get("tool_results") else "responder"],
+                    "planner_reasoning": final_state.values.get("plan", {}).get("reasoning"),
+                    "tools_executed": len(final_state.values.get("tool_results", [])),
+                    "workflow_steps": ["planner", "executor" if final_state.values.get("tool_results") else "responder"],
                     "memory_persistent": True,
-                    "thread_id": thread_config["configurable"]["thread_id"]
+                    "thread_id": thread_config["configurable"]["thread_id"],
+                    # NEW: Human feedback debug info
+                    "confidence_score": final_state.values.get("confidence_score", 0.0),
+                    "human_approval_needed": final_state.values.get("needs_human_approval", False),
+                    "human_feedback_enabled": final_state.values.get("human_feedback_enabled", False),
+                    "next_nodes": final_state.next if final_state.next else None
                 }
             
             return response_data
