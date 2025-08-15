@@ -52,26 +52,25 @@ law-exam-agent/
 - **Ollama** (for local LLM) or **OpenAI API key**
 - **Google Serper API key** (for web search)
 
-### 1. Backend Setup
+### Setup and Run
 
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd law-exam-agent/backend
+cd law-exam-agent
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# First-time setup (creates venv, installs all dependencies)
+make setup
 
-# Install dependencies
-pip install -r requirements.txt
+# Configure environment (copy and edit .env file)
+cp backend/.env.example backend/.env
+# Edit backend/.env with your API keys
 
-# Configure environment
-cp .env.example .env
-# Edit .env with your API keys and configuration
+# Start both backend and frontend servers
+make start
 ```
 
-### 2. Environment Configuration
+### Environment Configuration
 
 Edit `backend/.env`:
 
@@ -94,27 +93,16 @@ AGENT_NAME=AutonomousLangGraphAgent
 TOOL_SCHEMA_VALIDATION=true
 ```
 
-### 3. Start Backend Server
+### Available Makefile Commands
 
-```bash
-cd backend
-uvicorn main:app --reload --port 8000
-```
+- `make setup` - Complete setup for new developers (creates venv + installs dependencies)
+- `make start` - Start both backend and frontend servers
+- `make start-backend` - Start only the backend server (with venv activated)
+- `make start-frontend` - Start only the frontend server
+- `make stop` - Stop all running servers
+- `make help` - Show all available commands
 
-### 4. Frontend Setup
-
-```bash
-# In a new terminal
-cd law-exam-agent/frontend
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-```
-
-### 5. Access the Application
+### Access the Application
 
 Open your browser and navigate to:
 - **Frontend**: http://localhost:5173
